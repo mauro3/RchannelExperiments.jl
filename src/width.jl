@@ -247,7 +247,7 @@ Try to return the best of both outlines for one image or all of a ep)
 """
 
 function channel_width(ep::ExpImgs; verbose=false, vverbose=false)
-    @unpack dir, ns, p1, p2, thin_num,
+    @unpack dir, ns, p1, p2, thin_num, algo,
             minhalfwidth_orig, gauss_w, quant, gap, median_filter_region = ep
     minhalfwidth = minhalfwidth_orig÷thin_num
 
@@ -260,8 +260,13 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false)
 #    for n in ns
         img = prep_img(imgs[n], ep; verbose=vverbose)
         @time t, b = channel_width(img, last_top, last_bottom, ep, "$n:  $(imgs[n])",
-                             verbose=verbose,
-                             vverbose=vverbose)
+                                   algo,
+                                   verbose=verbose,
+                                   vverbose=vverbose)
+        if verbose && algo!=:both
+            plot_all_n_new(img, t, b, t, b, t, b;
+                           title="$n:  $(imgs[n])")
+        end
         last_top = t
         last_bottom = b
         append!(tops, t)
@@ -273,7 +278,7 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false)
 end
 
 
-function channel_width(img, last_top, last_bottom, ep::ExpImgs, title;
+function channel_width(img, last_top, last_bottom, ep::ExpImgs, title, algo;
                        verbose=false, vverbose=false)
     @unpack color_loc, minhalfwidth_orig, gauss_w, quant, gap, median_filter_region, thin_num = ep
     minhalfwidth = minhalfwidth_orig÷thin_num
@@ -287,10 +292,15 @@ function channel_width(img, last_top, last_bottom, ep::ExpImgs, title;
 
     # minhalfwidth_cur = max(min(minimum(last_top), minimum(last_bottom)) - minhalfwidth÷5, minhalfwidth)
     minhalfwidth_cur = minhalfwidth
-    top_t, bottom_t, tot_t = channel_width_thresholding(
-        img, color_loc, median_filter_region; verbose=false)#vverbose)
-    top_e, bottom_e, tot_e = channel_width_edgedetection(
-        img, minhalfwidth_cur, gauss_w, quant, gap; verbose=vverbose)
+    if algo in [:both, :thresh]
+        top_t, bottom_t, tot_t = channel_width_thresholding(
+            img, color_loc, median_filter_region; verbose=false)#vverbose)
+        algo==:thresh && return top_t, bottom_t
+    elseif algo in [:both, :edge]
+        top_e, bottom_e, tot_e = channel_width_edgedetection(
+            img, minhalfwidth_cur, gauss_w, quant, gap; verbose=vverbose)
+        algo==:edge && return top_e, bottom_e
+    end
 
     # now produce a best vector somehow:
 

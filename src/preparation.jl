@@ -38,6 +38,11 @@ Notes: needs to be in sync with ExpImgs defaults definition.
 rotate_n_crop(img, ep::ExpImgs; verbose=false) =
     rotate_n_crop(img, ep.p1, ep.p2, ep.halfheight_crop, verbose=verbose)
 function rotate_n_crop(img, p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, halfheight::Integer; verbose=false)
+    if verbose
+        guidict = imshow(img);
+        annotate!(guidict, AnnotationPoint(p1[2], p1[1], shape='x', size=20, linewidth=2));
+        annotate!(guidict, AnnotationPoint(p2[2], p2[1], shape='x', size=20, linewidth=2));
+    end
     @assert p1[2]<=p2[2] "point p1 must be on the left of p2"
     angle = atan2(p2[1]-p1[1], p2[2]-p1[2])
     len = round(Int, sqrt( (p2[1]-p1[1])^2 + (p2[2]-p1[2])^2 ))

@@ -1,4 +1,11 @@
 
+function imshow_file(fl, ep)
+    img = Images.load(fl);
+    guidict = ImageView.imshow(img);
+    ImageView.annotate!(guidict, ImageView.AnnotationPoint(p1[2], p1[1], shape='x', size=20, linewidth=2));
+    ImageView.annotate!(guidict, ImageView.AnnotationPoint(p2[2], p2[1], shape='x', size=20, linewidth=2));
+end
+
 
 function plot_lines_on_img(img, top, bottom;
                           col="r", label="", ax=nothing,

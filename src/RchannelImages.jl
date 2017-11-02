@@ -28,6 +28,7 @@ This holds all data needed to process pictures from one Experiment.
     color_loc::Tuple{Int,Int} = (fld1(siz[1],2), fld1(siz[2],2))
     ns::Vector{Int}
     minhalfwidth_orig  # minimal half-width of R-channel in pixels of original image
+    algo::Symbol=[:both, :thresh, :edge][1]
     gauss_w = 1
     quant::Float64=0.6
     gap = 19
