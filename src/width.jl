@@ -39,10 +39,10 @@ end
 
 
 function channel_width_thresholding(img_, loc, median_filter_region; verbose=false)
+    img_ = img_.>findtrough(img_, verbose=verbose);
     if median_filter_region!=(0,0)
         img_ = median_filter(img_, median_filter_region)
     end
-    img_ = img_.>findtrough(img_, verbose=verbose);
     img_3 = keep_only_big_regions(img_, loc,
                                   round(Int,(sqrt(length(img_))/50)^2),
                                   verbose=verbose);
@@ -186,6 +186,7 @@ function channel_width_edgedetection(img_, minhalfwidth, gauss_w,
     out = labs.>0;
     verbose && imshow(labs.>0);
 
+
     ## TODO: actually join the big pieces
 
     # now determine distance from middle+minhalfwidth to first peak
@@ -246,18 +247,18 @@ Try to return the best of both outlines for one image or all of a ep)
 """
 
 function channel_width(ep::ExpImgs; verbose=false, vverbose=false)
-    @unpack dir, ns, p1, p2, halfheight, thin_num,
-            minhalfwidth, gauss_w, quant, gap, median_filter_region = ep
+    @unpack dir, ns, p1, p2, thin_num,
+            minhalfwidth_orig, gauss_w, quant, gap, median_filter_region = ep
+    minhalfwidth = minhalfwidth_orig÷thin_num
 
     imgs = ["$dir/$f" for f in readdir(dir)];
     tops = Int[]
     bottoms = Int[]
-    local img_
     last_top = [minhalfwidth]
     last_bottom = [minhalfwidth]
     @showprogress for n in ns
         img = prep_img(imgs[n], ep; verbose=vverbose)
-        t, b = channel_width(img, last_top, last_bottom, ep, "$n:  $(imgs[n])",
+        @time t, b = channel_width(img, last_top, last_bottom, ep, "$n:  $(imgs[n])",
                              verbose=verbose,
                              vverbose=vverbose)
         last_top = t
@@ -273,7 +274,8 @@ end
 
 function channel_width(img, last_top, last_bottom, ep::ExpImgs, title;
                        verbose=false, vverbose=false)
-    @unpack color_loc, minhalfwidth, gauss_w, quant, gap, median_filter_region = ep
+    @unpack color_loc, minhalfwidth_orig, gauss_w, quant, gap, median_filter_region, thin_num = ep
+    minhalfwidth = minhalfwidth_orig÷thin_num
 
     if length(last_bottom)==1
         last_bottom = zeros(Int, size(img,2)) .+ last_bottom
@@ -282,10 +284,12 @@ function channel_width(img, last_top, last_bottom, ep::ExpImgs, title;
         last_top = zeros(Int, size(img,2)) .+ last_top
     end
 
+    # minhalfwidth_cur = max(min(minimum(last_top), minimum(last_bottom)) - minhalfwidth÷5, minhalfwidth)
+    minhalfwidth_cur = minhalfwidth
     top_t, bottom_t, tot_t = channel_width_thresholding(
-        img, color_loc, median_filter_region; verbose=vverbose)
+        img, color_loc, median_filter_region; verbose=false)#vverbose)
     top_e, bottom_e, tot_e = channel_width_edgedetection(
-        img, minhalfwidth, gauss_w, quant, gap; verbose=vverbose)
+        img, minhalfwidth_cur, gauss_w, quant, gap; verbose=vverbose)
 
     # now produce a best vector somehow:
 
@@ -329,14 +333,21 @@ function channel_width(img, last_top, last_bottom, ep::ExpImgs, title;
         new_bottom[i] = pick_next_point(bottom_t[i], bottom_e[i], new_bottom[i+1], last_bottom[i])
     end
 
+    window = 10
+    niter = 30
+    quantile_filter!(new_top, 0.1, 2, 1, window, window+1, niter)
+    quantile_filter!(new_bottom, 0.1, 2, 1, window, window+1, niter)
+
+    window = 11
+    new_top = round(Int,mapwindow(mean, new_top, window))
+    new_bottom = round(Int,mapwindow(mean, new_bottom, window))
+
     @time if verbose
         plot_all_n_new(img, new_top, new_bottom, top_t, bottom_t, top_e, bottom_e;
                         col="r", label="", ax=nothing, title=title,
                         legend=false)
         P.draw()
     end
-
-
     return new_top, new_bottom
 end
 

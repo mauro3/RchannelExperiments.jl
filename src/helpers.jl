@@ -1,15 +1,4 @@
 
-"""
-"""
-function median_filter!(img, reps=1)
-    ni,nj=size(img)
-    @inbounds for r=1:reps
-        for j=2:nj-1, i=2:ni-1
-            img[i,j] = median(img[i-1:i+1,j-1:j+1][:])
-        end
-    end
-    img
-end
 median_filter(img, window=(3,3)) = mapwindow(median!, img, window)
 
 #################
@@ -268,19 +257,29 @@ function find_spikes_quantile(vec, comp_vec_q= >,
     outliers, med[outliers-pre_window]
 end
 
+"Filters outliers above certain quantiles"
 function quantile_filter!(vec,
                           quant_cut=0.1, quant_offset=0, quant_factor=1,
-                          pre_window=length(vec)÷10, post_window = 0;
+                          pre_window=length(vec)÷10, post_window = pre_window+1,
+                          niter = 10,
                           verbose=false)
-    upper, medu = find_spikes_quantile(vec, >,
-                                 quant_cut, quant_offset, quant_factor,
-                                 pre_window, post_window;
-                                 verbose=verbose)
-    lower, medl = find_spikes_quantile(vec, <,
-                                 1-quant_cut, quant_offset, quant_factor,
-                                 pre_window, post_window;
-                                      verbose=verbose)
-    vec[upper] = medu
-    vec[lower] = medl
+    lenu = lenl = -1
+    for i=1:niter
+        upper, medu = find_spikes_quantile(vec, >,
+                                           quant_cut, quant_offset, quant_factor,
+                                           pre_window, post_window;
+                                           verbose=verbose)
+        lower, medl = find_spikes_quantile(vec, <,
+                                           1-quant_cut, quant_offset, quant_factor,
+                                           pre_window, post_window;
+                                           verbose=verbose)
+
+        lenu==length(upper) && break
+        lenl==length(lower) && break
+        lenu = length(upper)
+        lenl = length(lower)
+        vec[upper] = medu
+        vec[lower] = medl
+    end
     vec
 end

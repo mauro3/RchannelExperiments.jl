@@ -36,7 +36,7 @@ height is 2x halfheight.
 Notes: needs to be in sync with ExpImgs defaults definition.
 """
 rotate_n_crop(img, ep::ExpImgs; verbose=false) =
-    rotate_n_crop(img, ep.p1, ep.p2, ep.halfheight, verbose=verbose)
+    rotate_n_crop(img, ep.p1, ep.p2, ep.halfheight_crop, verbose=verbose)
 function rotate_n_crop(img, p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, halfheight::Integer; verbose=false)
     @assert p1[2]<=p2[2] "point p1 must be on the left of p2"
     angle = atan2(p2[1]-p1[1], p2[2]-p1[2])
@@ -67,8 +67,8 @@ function prep_img(path::String, ep::ExpImgs; verbose=false)
     prep_img(img_color, ep; verbose=verbose)
 end
 function prep_img(img_color::AbstractArray, ep::ExpImgs; verbose=false)
-    @unpack p1, p2, halfheight, thin_num = ep
-    img_color = rotate_n_crop(img_color, p1, p2, halfheight, verbose=verbose)
+    @unpack p1, p2, halfheight_crop, thin_num = ep
+    img_color = rotate_n_crop(img_color, p1, p2, halfheight_crop, verbose=verbose)
     img_color = thin(img_color, thin_num);
     @assert size(img_color)==ep.siz
     # calculate the difference in color
