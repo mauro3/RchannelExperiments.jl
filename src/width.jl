@@ -257,6 +257,7 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false)
     last_top = [minhalfwidth]
     last_bottom = [minhalfwidth]
     @showprogress for n in ns
+#    for n in ns
         img = prep_img(imgs[n], ep; verbose=vverbose)
         @time t, b = channel_width(img, last_top, last_bottom, ep, "$n:  $(imgs[n])",
                              verbose=verbose,
@@ -317,20 +318,34 @@ function channel_width(img, last_top, last_bottom, ep::ExpImgs, title;
 
     new_top = zeros(last_top)
     new_top[ti] = tv
-    for i=ti+1:length(new_top)
-        new_top[i] = pick_next_point(top_t[i], top_e[i], new_top[i-1], last_top[i])
+    if ti<length(new_top)
+        new_top[ti+1] = pick_next_point(top_t[ti+1], top_e[ti+1], new_top[ti], last_top[ti])
+        for i=ti+2:length(new_top)
+            new_top[i] = pick_next_point(top_t[i], top_e[i], new_top[i-1], new_top[i-2], last_top[i])
+        end
     end
-    for i=ti-1:-1:1
-        new_top[i] = pick_next_point(top_t[i], top_e[i], new_top[i+1], last_top[i])
+    if ti>1
+        new_top[ti-1] = pick_next_point(top_t[ti-1], top_e[ti-1], new_top[ti], last_top[ti])
+        for i=ti-2:-1:1
+            new_top[i] = pick_next_point(top_t[i], top_e[i], new_top[i+1], new_top[i+2], last_top[i])
+        end
     end
 
     new_bottom = zeros(last_bottom)
     new_bottom[bi] = bv
-    for i=bi+1:length(new_bottom)
-        new_bottom[i] = pick_next_point(bottom_t[i], bottom_e[i], new_bottom[i-1], last_bottom[i])
+    if bi<length(new_bottom)
+        # start
+        new_bottom[bi+1] = pick_next_point(bottom_t[bi+1], bottom_e[bi+1], new_bottom[bi], last_bottom[bi])
+        for i=bi+2:length(new_bottom)
+            new_bottom[i] = pick_next_point(bottom_t[i], bottom_e[i], new_bottom[i-1], new_bottom[i-2], last_bottom[i])
+        end
     end
-    for i=bi-1:-1:1
-        new_bottom[i] = pick_next_point(bottom_t[i], bottom_e[i], new_bottom[i+1], last_bottom[i])
+    if bi>1
+        # start
+        new_bottom[bi-1] = pick_next_point(bottom_t[bi-1], bottom_e[bi-1], new_bottom[bi], last_bottom[bi])
+        for i=bi-2:-1:1
+            new_bottom[i] = pick_next_point(bottom_t[i], bottom_e[i], new_bottom[i+1], new_bottom[i+2], last_bottom[i])
+        end
     end
 
     window = 10
@@ -352,13 +367,17 @@ function channel_width(img, last_top, last_bottom, ep::ExpImgs, title;
 end
 
 """
-Squared distance of two points, if they are both larger than v_old.
+    how_close(v1, v2, v_old, weightdiv=5)
+
+Squared distance of three points, the distance to the last has only
+1/weightdiv the weight.  Returns also the v1 or v1 which is closer to
+v_old.
 """
-function how_close(v1, v2, v_old)
+function how_close(v1, v2, v_old, weightdiv=5)
     if v_old<0
         return 10^6, -1
     else
-        fit = ((v1-v_old)^2 + (v2-v_old)^2)÷5 + (v2-v1)^2
+        fit = ((v1-v_old)^2 + (v2-v_old)^2)÷weightdiv + (v2-v1)^2
         tmp = (v1-v_old)^2>(v2-v_old)^2 ? v2 : v1
         return fit, tmp
         # if v1==v2
@@ -371,17 +390,26 @@ function how_close(v1, v2, v_old)
     end
 end
 
+"""
+    pick_next_point(v1, v2, vp, v_old)
+    pick_next_point(v1, v2, vp, vpp, v_old)
+
+Try to pick the better of v1 and v2.
+"""
 function pick_next_point(v1, v2, vp, v_old)
     fits = zeros(2)
     for (i,v) in enumerate((v1,v2))
         # oldness = v>v_old ? (v-v_old)^2 : 2*(v-v_old)^2
         oldness = (v-v_old)^2
-        fits[i] = (v-vp)^2 + oldness
+        fits[i] = (v-vp)^2 + 2*oldness÷3
     end
-    if fits[1]>fits[2]
-        return v2
-    else
+    ii = findmin(fits)[2]
+    if ii==1
         return v1
+    elseif ii==2
+        return v2
+    else # mean is best -> try harder to find which v is better
+        error()
     end
     ## old:
     # if v1>=v_old && v2>=v_old
@@ -399,6 +427,26 @@ function pick_next_point(v1, v2, vp, v_old)
     #     error()
     # end
 end
+
+function pick_next_point(v1, v2, vp, vpp, v_old)
+    fits = zeros(2)
+    dv = vpp-vp
+    for (i,v) in enumerate((v1,v2))
+        # oldness = v>v_old ? (v-v_old)^2 : 2*(v-v_old)^2
+        oldness = (v-v_old)^2
+        dvv = v-vp
+        fits[i] = (dv-dvv)^2 + oldness÷5
+    end
+    ii = findmin(fits)[2]
+    if ii==1
+        return v1
+    elseif ii==2
+        return v2
+    else
+        error()
+    end
+end
+
 
 function rchannel_stats(img, ep::ExpImgs, m_per_px)
     w = channel_width(img, ep, m_per_px)
