@@ -1,5 +1,6 @@
 
-function plot_line_on_img(img, top, bottom;
+
+function plot_lines_on_img(img, top, bottom;
                           col="r", label="", ax=nothing,
                           legend=true)
     ax==nothing || P.axes(ax)
@@ -8,27 +9,42 @@ function plot_line_on_img(img, top, bottom;
     P.imshow(img, aspect="equal", extent=(1,size(img,2),size(img,1), 1), cmap=greys)
     top = top2ind(top, img)
     bottom = bottom2ind(bottom, img)
-    P.plot(top, c=col, lw=1, label="$label top")
-    P.plot(bottom, c=col, lw=1, label="$label bottom")
+    P.plot(1:length(top), top, c=col, lw=1, label="$label top")
+    P.plot(1:length(top), bottom, c=col, lw=1, label="$label bottom")
     legend && P.legend()
 end
 
-function plot_two_lines2(img_, top_e, bottom_e, top_t, bottom_t; title="")
+function plot_all_n_new(img, top, bottom, top_t, bottom_t, top_e, bottom_e;
+                        col="r", label="", ax=nothing, title="",
+                        legend=false)
+    ax = P.subplot(2,1,1)
+    plot_lines_on_img(img, top, bottom,
+                     col=col, label=label, ax=ax,
+                     legend=legend)
+    P.title(title)
+    ax = P.subplot(2,1,2)
+    P.cla()
+    plot_two_lines(img, top_e, bottom_e, top_t, bottom_t)
+    plot_lines_on_img(img, top, bottom,
+                      col=col, label=label, ax=ax,
+                      legend=legend)
+end
+function plot_two_lines2(img, top_e, bottom_e, top_t, bottom_t; title="")
     #P.figure()
     ax = P.subplot(2,1,1)
-    plot_on_img(img_, top_e, bottom_e)
+    plot_lines_on_img(img, top_e, bottom_e)
     P.ylabel("edge")
     P.title(t)
     P.subplot(2,1,2, sharex=ax, sharey=ax)
-    plot_on_img(img_, top_t, bottom_t)
+    plot_lines_on_img(img, top_t, bottom_t)
     P.ylabel("thresh")
 end
 
-function plot_two_lines(img_, top_e, bottom_e, top_t, bottom_t; title="", ax=nothing)
+function plot_two_lines(img, top_e, bottom_e, top_t, bottom_t; title="", ax=nothing)
     ax==nothing || P.axes(ax)
-    plot_on_img(img_, top_e, bottom_e, "r", "edge")
-    plot_on_img(img_, top_t, bottom_t, "g", "thresh")
-    P.title(t)
+    plot_lines_on_img(img, top_e, bottom_e, col="b", label="edge")
+    plot_lines_on_img(img, top_t, bottom_t, col="g", label="thresh")
+    P.title(title)
 end
 
 function plot_proms(mag, i)

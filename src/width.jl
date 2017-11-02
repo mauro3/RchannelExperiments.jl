@@ -11,13 +11,14 @@ bottom_inds(img) = getmid(img)+1:size(img,1)
 
 
 function findtrough(img; verbose=false)
-    hi = fit(Histogram, img[:], closed=:left, nbins=100)
+    nbins = 100
+    hi = fit(Histogram, img[:], closed=:left, nbins=nbins)
     peaks, ips, proms, doms = findpeaks(-hi.weights[1:(end-end÷4)])
-    i = findmax(proms)[2]
+    i = findmax(proms[ips.<(nbins÷2)])[2] # look only if first half of histogram
     proms[i]<length(img)/500 && error("No color boundary found.")
-    # verbose && PyPlot.plot(1:length(hi.weights), -hi.weights)
-    verbose && PyPlot.bar(hi.edges[1][1:end-1], hi.weights)
-    verbose && @show peaks[i]
+    verbose && P.plot(1:length(hi.weights), -hi.weights)
+    #verbose && P.bar(hi.edges[1][1:end-1], hi.weights)
+    verbose && @show ips[i]
     ips[i]
 end
 
@@ -37,7 +38,7 @@ function keep_only_big_regions(img, loc, siz=round(Int,(sqrt(length(img))/20)^2)
 end
 
 
-function channel_width_thresholding(img_, loc, median_filter_region=(0,0); verbose=false)
+function channel_width_thresholding(img_, loc, median_filter_region; verbose=false)
     if median_filter_region!=(0,0)
         img_ = median_filter(img_, median_filter_region)
     end
@@ -45,6 +46,8 @@ function channel_width_thresholding(img_, loc, median_filter_region=(0,0); verbo
     img_3 = keep_only_big_regions(img_, loc,
                                   round(Int,(sqrt(length(img_))/50)^2),
                                   verbose=verbose);
+    verbose && imshow(img_);
+    verbose && imshow(img_3);
 
     mid = getmid(img_)
     # top = squeeze(sum(img_3[1:mid,:],1),1)
@@ -69,8 +72,8 @@ end
 
 Determine width using edge detection.
 """
-function channel_width_edgedetection(img_, minhalfwidth, gauss_w = 10,
-                                     quant=0.8, gap=11, morphgrad=false; verbose=false)
+function channel_width_edgedetection(img_, minhalfwidth, gauss_w,
+                                     quant, gap, morphgrad=false; verbose=false)
     @assert !iseven(gap) "gap must be a odd number"
     # works on img_
     verbose && imshow(img_);
@@ -235,57 +238,56 @@ end
 ###############
 #
 
-function channel_width(dir_::String, ns, p1, p2, halfheight, thin_num,
-                       minhalfwidth, gauss_w = 10,
-                       quant=0.8, gap=11,
-                       median_filter_region=(0,0);
-                       verbose=false)
-    imgs = ["$dir_/$f" for f in readdir(dir_)];
+"""
+    channel_width(ep::ExpImgs; verbose=false)
+    channel_width(img_, last_top, last_bottom, eq::ExpImgs; verbose=false)
+
+Try to return the best of both outlines for one image or all of a ep)
+"""
+
+function channel_width(ep::ExpImgs; verbose=false, vverbose=false)
+    @unpack dir, ns, p1, p2, halfheight, thin_num,
+            minhalfwidth, gauss_w, quant, gap, median_filter_region = ep
+
+    imgs = ["$dir/$f" for f in readdir(dir)];
     tops = Int[]
     bottoms = Int[]
     local img_
     last_top = [minhalfwidth]
     last_bottom = [minhalfwidth]
-    for n in ns
-        img_, loc = prep_img(imgs[n], p1, p2, halfheight, thin_num; verbose=verbose)
-        t, b = channel_width(img_, loc, last_top, last_bottom,
-                             minhalfwidth, gauss_w,
-                             quant, gap,
-                             median_filter_region;
-                             verbose=verbose)
+    @showprogress for n in ns
+        img = prep_img(imgs[n], ep; verbose=vverbose)
+        t, b = channel_width(img, last_top, last_bottom, ep, "$n:  $(imgs[n])",
+                             verbose=verbose,
+                             vverbose=vverbose)
         last_top = t
         last_bottom = b
-        push!(tops, t)
-        push!(bottoms,b)
+        append!(tops, t)
+        append!(bottoms,b)
     end
-    tops = reshape(tops, size(img_,2))
-    bottoms = reshape(bottoms, size(img_,2))
+    tops = reshape(tops, ep.siz[2], length(tops)÷ep.siz[2])
+    bottoms = reshape(bottoms, ep.siz[2], length(tops)÷ep.siz[2])
     return tops, bottoms
 end
 
 
-"""
-Try to return the best of both outlines.
-"""
-function channel_width(img_, loc, last_top, last_bottom,
-                       minhalfwidth, gauss_w = 10,
-                       quant=0.8, gap=11,
-                       median_filter_region=(0,0);
-                       verbose=false)
+function channel_width(img, last_top, last_bottom, ep::ExpImgs, title;
+                       verbose=false, vverbose=false)
+    @unpack color_loc, minhalfwidth, gauss_w, quant, gap, median_filter_region = ep
 
     if length(last_bottom)==1
-        last_bottom = zeros(Int, size(img_,2)) .+ last_bottom
+        last_bottom = zeros(Int, size(img,2)) .+ last_bottom
     end
     if length(last_top)==1
-        last_top = zeros(Int, size(img_,2)) .+ last_top
+        last_top = zeros(Int, size(img,2)) .+ last_top
     end
 
-
     top_t, bottom_t, tot_t = channel_width_thresholding(
-        img_, loc, median_filter_region; verbose=verbose)
+        img, color_loc, median_filter_region; verbose=vverbose)
     top_e, bottom_e, tot_e = channel_width_edgedetection(
-        img_, minhalfwidth, gauss_w, quant, gap; verbose=verbose)
-    # now produce a best vector somehow
+        img, minhalfwidth, gauss_w, quant, gap; verbose=vverbose)
+
+    # now produce a best vector somehow:
 
     # Go through to find points of agreement which are farther than v_old.
     # Of those pick the closest to v_old.
@@ -306,7 +308,9 @@ function channel_width(img_, loc, last_top, last_bottom,
             bv = vv
         end
     end
-    #
+    @assert tv>0
+    @assert bv>0
+
     new_top = zeros(last_top)
     new_top[ti] = tv
     for i=ti+1:length(new_top)
@@ -325,6 +329,14 @@ function channel_width(img_, loc, last_top, last_bottom,
         new_bottom[i] = pick_next_point(bottom_t[i], bottom_e[i], new_bottom[i+1], last_bottom[i])
     end
 
+    @time if verbose
+        plot_all_n_new(img, new_top, new_bottom, top_t, bottom_t, top_e, bottom_e;
+                        col="r", label="", ax=nothing, title=title,
+                        legend=false)
+        P.draw()
+    end
+
+
     return new_top, new_bottom
 end
 
@@ -332,23 +344,27 @@ end
 Squared distance of two points, if they are both larger than v_old.
 """
 function how_close(v1, v2, v_old)
-    if v1<v_old || v2<v_old || v_old<0
-        return 1e6, -1
+    if v_old<0
+        return 10^6, -1
     else
-        if v1==v2
-            # weight closeness to v_old
-            return sqrt((v1-v_old)^2)/5000, v1
-        else
-            tmp = (v1-v_old)^2>(v2-v_old)^2 ? v2 : v1
-            return (v1-v2)^2.0, tmp
-        end
+        fit = ((v1-v_old)^2 + (v2-v_old)^2)÷5 + (v2-v1)^2
+        tmp = (v1-v_old)^2>(v2-v_old)^2 ? v2 : v1
+        return fit, tmp
+        # if v1==v2
+        #     # weight closeness to v_old
+        #     return sqrt((v1-v_old)^2)/5000, v1
+        # else
+        #     tmp = (v1-v_old)^2>(v2-v_old)^2 ? v2 : v1
+        #     return (v1-v2)^2.0, tmp
+        # end
     end
 end
 
 function pick_next_point(v1, v2, vp, v_old)
     fits = zeros(2)
     for (i,v) in enumerate((v1,v2))
-        oldness = v>v_old ? 0.0 : (v-v_old)^2
+        # oldness = v>v_old ? (v-v_old)^2 : 2*(v-v_old)^2
+        oldness = (v-v_old)^2
         fits[i] = (v-vp)^2 + oldness
     end
     if fits[1]>fits[2]
@@ -373,8 +389,8 @@ function pick_next_point(v1, v2, vp, v_old)
     # end
 end
 
-function rchannel_stats(img, m_per_px)
-    w = channel_width(img, m_per_px)
+function rchannel_stats(img, ep::ExpImgs, m_per_px)
+    w = channel_width(img, ep, m_per_px)
     scalopping = (maximum(w)-minimum(w))/mean(w)
     return mean(w), std(w), scalopping
 end

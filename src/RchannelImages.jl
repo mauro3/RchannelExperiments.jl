@@ -2,21 +2,22 @@
 
 module RchannelImages
 
-using Images, ImageView, ImageSegmentation
-using CoordinateTransformations, OffsetArrays
-import PyPlot
+@time using Images, ImageView, ImageSegmentation
+@time using CoordinateTransformations, OffsetArrays
+@time using ProgressMeter
+@time import PyPlot
 const P = PyPlot
-using StatsBase
-using Parameters
+@time using StatsBase
+@time using Parameters
 
 include("helpers.jl")
 
-export ExpPics, channel_width
+export ExpImgs, channel_width, prep_img
 
 """
 This holds all data needed to process pictures from one Experiment.
 """
-@with_kw struct ExpPics @deftype Int
+@with_kw struct ExpImgs @deftype Int
     dir::String
     p1::Tuple{Int,Int}
     p2::Tuple{Int,Int}

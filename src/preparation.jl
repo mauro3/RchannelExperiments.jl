@@ -25,7 +25,7 @@ thin(img,step) = img[1:step:end,1:step:end]
 
 
 """
-    rotate_n_crop(img, ep::ExpPics; verbose=false)
+    rotate_n_crop(img, ep::ExpImgs; verbose=false)
     rotate_n_crop(img, p1::Tuple{Int,Int}, p2::Tuple{Int,Int},
                   halfheight::Integer; verbose=false)
 
@@ -33,9 +33,9 @@ Rotates the image such that the line through p1 and p2 is horizontal.
 It then crops it such that the width spans p1 and p2 and the
 height is 2x halfheight.
 
-Notes: needs to be in sync with ExpPics defaults definition.
+Notes: needs to be in sync with ExpImgs defaults definition.
 """
-rotate_n_crop(img, ep::ExpPics; verbose=false) =
+rotate_n_crop(img, ep::ExpImgs; verbose=false) =
     rotate_n_crop(img, ep.p1, ep.p2, ep.halfheight, verbose=verbose)
 function rotate_n_crop(img, p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, halfheight::Integer; verbose=false)
     @assert p1[2]<=p2[2] "point p1 must be on the left of p2"
@@ -54,34 +54,34 @@ function rotate_n_crop(img, p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, halfheight::
 end
 
 """
-    prep_img(path::String, ep::ExpPics; verbose=false)
+    prep_img(path::String, ep::ExpImgs; verbose=false)
     prep_img(img_color, ep; verbose=false)
 
 Prepare image by:
 - rotate and crop
 - colordiff it
 """
-function prep_img(path::String, ep::ExpPics; verbose=false)
+function prep_img(path::String, ep::ExpImgs; verbose=false)
     verbose && println(path)
     img_color = load(path);
     prep_img(img_color, ep; verbose=verbose)
 end
-function prep_img(img_color::AbstractArray, ep::ExpPics; verbose=false)
+function prep_img(img_color::AbstractArray, ep::ExpImgs; verbose=false)
     @unpack p1, p2, halfheight, thin_num = ep
     img_color = rotate_n_crop(img_color, p1, p2, halfheight, verbose=verbose)
     img_color = thin(img_color, thin_num);
     @assert size(img_color)==ep.siz
     # calculate the difference in color
-    img, loc = colordiffit(img_color, ep, verbose=verbose);
-    return img, loc
+    img = colordiffit(img_color, ep, verbose=verbose);
+    return img
 end
 
 """
-    colordiffit(img_color, ep::ExpPics; verbose=false)
+    colordiffit(img_color, ep::ExpImgs; verbose=false)
 
 Use `colordiff` make an image of perceived color difference
 """
-function colordiffit(img_color, ep::ExpPics; verbose=false)
+function colordiffit(img_color, ep::ExpImgs; verbose=false)
     loc = ep.color_loc
     c0 = img_color[loc...]
     if verbose
@@ -89,5 +89,5 @@ function colordiffit(img_color, ep::ExpPics; verbose=false)
         dp = size(img_color,1)÷50
         annotate!(guidict, AnnotationBox(loc[2]+dp, loc[1]+dp, loc[2]-dp, loc[1]-dp, linewidth=2, color=RGB(0,0,1)))
     end
-    colordiff.(img_color, c0), loc
+    colordiff.(img_color, c0)
 end
