@@ -2,13 +2,18 @@
 
 module RchannelImages
 
-@time using Images, ImageView, ImageSegmentation
-@time using CoordinateTransformations, OffsetArrays
-@time using ProgressMeter
-@time import PyPlot
+using Images, ImageView, ImageSegmentation
+using CoordinateTransformations, OffsetArrays
+using ProgressMeter
+import PyPlot
+import FileIO
+import JLD
+# const JLD = JLD2
 const P = PyPlot
-@time using StatsBase
-@time using Parameters
+import PyCall
+PyCall.@pyimport matplotlib.animation as anim
+using StatsBase
+using Parameters
 
 include("helpers.jl")
 

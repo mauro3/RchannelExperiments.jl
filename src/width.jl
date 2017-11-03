@@ -1,10 +1,12 @@
 #########
 # Width
 getmid(img) = fld1(size(img,1),2)
-top2ind(top, img) = getmid(img) - top + 1
-bottom2ind(bottom, img) = bottom + getmid(img)
-top_inds(img) = getmid(img):-1:1
-bottom_inds(img) = getmid(img)+1:size(img,1)
+getmid(ep::ExpImgs) = fld1(ep.siz[1],2)
+
+top2ind(top, img_or_ep) = getmid(img_or_ep) - top + 1
+bottom2ind(bottom, img_or_ep) = bottom + getmid(img_or_ep)
+top_inds(img_or_ep) = getmid(img_or_ep):-1:1
+bottom_inds(img_or_ep) = getmid(img_or_ep)+1:size(img,1)
 
 ################
 # width via color tresholding
@@ -246,7 +248,8 @@ end
 Try to return the best of both outlines for one image or all of a ep)
 """
 
-function channel_width(ep::ExpImgs; verbose=false, vverbose=false)
+function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
+                       overwrite=false)
     @unpack dir, ns, p1, p2, thin_num, algo,
             minhalfwidth_orig, gauss_w, quant, gap, median_filter_region = ep
     minhalfwidth = minhalfwidth_orig÷thin_num
@@ -274,6 +277,7 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false)
     end
     tops = reshape(tops, ep.siz[2], length(tops)÷ep.siz[2])
     bottoms = reshape(bottoms, ep.siz[2], length(tops)÷ep.siz[2])
+    saveit && save_lines(tops, bottoms, ep, overwrite=overwrite)
     return tops, bottoms
 end
 
@@ -296,12 +300,14 @@ function channel_width(img, last_top, last_bottom, ep::ExpImgs, title, algo;
         top_t, bottom_t, tot_t = channel_width_thresholding(
             img, color_loc, median_filter_region; verbose=false)#vverbose)
         algo==:thresh && return top_t, bottom_t
-    elseif algo in [:both, :edge]
+    end
+    if algo in [:both, :edge]
         top_e, bottom_e, tot_e = channel_width_edgedetection(
             img, minhalfwidth_cur, gauss_w, quant, gap; verbose=vverbose)
         algo==:edge && return top_e, bottom_e
+    else
+        error("algo is $algo")
     end
-
     # now produce a best vector somehow:
 
     # Go through to find points of agreement which are farther than v_old.

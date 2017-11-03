@@ -7,3 +7,5 @@ OffsetArrays
 PyPlot
 StatsBase
 Parameters
+FileIO
+JLD2

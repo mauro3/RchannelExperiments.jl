@@ -283,3 +283,30 @@ function quantile_filter!(vec,
     end
     vec
 end
+
+
+#############
+# Saving and Loading
+function filename(ep::ExpImgs)
+    @unpack dir, thin_num, ns = ep
+    "$(dir)-thin$(thin_num)-ns$(length(ns))"
+end
+function save_lines(tops, bottoms, ep; overwrite=false)
+    fln = filename(ep)*".jld"
+    if isfile(fln) && !overwrite
+        warn("File exists, not saving!")
+        return nothing
+    end
+    save_lines(fln, tops, bottoms, ep)
+end
+
+function save_lines(fln, tops, bottoms, ep)
+    JLD.jldopen(fln, "w") do file
+        #JLD.addrequire(file, RchannelImages)
+        file["tops"] = tops
+        file["bottoms"]= bottoms
+        file["ep"] = ep
+    end
+    nothing
+end
+load_lines(fln) = tuple(values(JLD.load(fln))...)
