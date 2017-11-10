@@ -74,6 +74,8 @@ end
 
 Determine width using edge detection.
 """
+channel_width_edgedetection(img_, ep; verbose=false) =
+    channel_width_edgedetection(img_, ep.minhalfwidth, ep.gauss_w, ep.quant, ep.gap, verbose=verbose)
 function channel_width_edgedetection(img_, minhalfwidth, gauss_w,
                                      quant, gap, morphgrad=false; verbose=false)
     @assert !iseven(gap) "gap must be a odd number"
@@ -226,7 +228,7 @@ Filter outliers using median.  Probably better ways to do this.
 function filter1d_outliers!(vec::Vector{<:Integer}, halfwindow=1)
     len = length(vec)
     for i=eachindex(vec)
-        vec[i] = round(eltype(vec), median(@view vec[max(1,i-halfwindow):min(len,i+halfwindow)]))
+        vec[i] = round.(eltype(vec), median(@view vec[max(1,i-halfwindow):min(len,i+halfwindow)]))
     end
     vec
 end
@@ -259,10 +261,10 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
     bottoms = Int[]
     last_top = [minhalfwidth]
     last_bottom = [minhalfwidth]
-    @showprogress for n in ns
-#    for n in ns
+#    @showprogress for n in ns
+    for n in ns
         img = prep_img(imgs[n], ep; verbose=vverbose)
-        @time t, b = channel_width(img, last_top, last_bottom, ep, "$n:  $(imgs[n])",
+        t, b = channel_width(img, last_top, last_bottom, ep, "$n:  $(imgs[n])",
                                    algo,
                                    verbose=verbose,
                                    vverbose=vverbose)
@@ -370,12 +372,12 @@ function channel_width(img, last_top, last_bottom, ep::ExpImgs, title, algo;
     quantile_filter!(new_bottom, 0.1, 2, 1, window, window+1, niter)
 
     window = 11
-    new_top = round(Int,mapwindow(mean, new_top, window))
-    new_bottom = round(Int,mapwindow(mean, new_bottom, window))
+    new_top = round.(Int,mapwindow(mean, new_top, window))
+    new_bottom = round.(Int,mapwindow(mean, new_bottom, window))
 
-    @time if verbose
+    if verbose
         plot_all_n_new(img, new_top, new_bottom, top_t, bottom_t, top_e, bottom_e;
-                        col="r", label="", ax=nothing, title=title,
+                        col="r", label="", title=title,
                         legend=false)
         P.draw()
     end

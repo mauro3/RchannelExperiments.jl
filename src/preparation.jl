@@ -33,6 +33,9 @@ Rotates the image such that the line through p1 and p2 is horizontal.
 It then crops it such that the width spans p1 and p2 and the
 height is 2x halfheight.
 
+Besides the image it also returns the offset between the new image
+center and the old one.
+
 Notes: needs to be in sync with ExpImgs defaults definition.
 """
 rotate_n_crop(img, ep::ExpImgs; verbose=false) =
@@ -66,6 +69,11 @@ Prepare image by:
 - rotate and crop
 - colordiff it
 """
+function prep_img(img_num::Int, ep::ExpImgs; verbose=false)
+    @unpack dir = ep
+    path = ["$dir/$f" for f in readdir(dir)][ep.ns[img_num]];
+    prep_img(path, ep; verbose=verbose)
+end
 function prep_img(path::String, ep::ExpImgs; verbose=false)
     verbose && println(path)
     img_color = load(path);

@@ -22,8 +22,12 @@ function plot_lines_on_img(img, top, bottom;
     legend && P.legend()
 end
 
+"""
+Two subplots with one made to show all lines and the other just the new one.
+Both overlain by the current image.
+"""
 function plot_all_n_new(img, top, bottom, top_t=top, bottom_t=bottom, top_e=top_t, bottom_e=bottom_t;
-                        col="r", label="", ax=nothing, title="",
+                        col="r", label="", title="",
                         legend=false)
     ax = P.subplot(2,1,1)
     plot_lines_on_img(img, top, bottom,
@@ -37,6 +41,19 @@ function plot_all_n_new(img, top, bottom, top_t=top, bottom_t=bottom, top_e=top_
                       col=col, label=label, ax=ax,
                       legend=legend)
 end
+function plot_all_n_new(ep::ExpImgs, tops, bottoms;
+                        col="r", label="", title="",
+                        legend=false)
+    P.figure()
+    for i=1:length(ep.ns)
+        img = prep_img(i, ep)
+        plot_all_n_new(img, tops[:,i], bottoms[:,i],
+                       col=col, label=label, title=title)
+        P.draw()
+        sleep(0.01)
+    end
+end
+
 function plot_two_lines2(img, top_e, bottom_e, top_t, bottom_t; title="")
     #P.figure()
     ax = P.subplot(2,1,1)

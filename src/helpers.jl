@@ -231,7 +231,7 @@ Return
 function find_spikes_quantile(vec, comp_vec_q= >,
                                quant=0.9, quant_offset=median(vec), quant_factor=1,
                                pre_window=length(vec)÷10, post_window = 0;
-                               verbose=false)
+                              verbose=false)
     ex = 3
     pre_w = 1./(pre_window+1:-1:2)
     post_w = 1./(1:post_window).^ex
@@ -242,11 +242,13 @@ function find_spikes_quantile(vec, comp_vec_q= >,
     for i = pre_window+1:length(vec)-post_window
         vi = vec[i]
         v = @view vec[i-pre_window:i+post_window-1]
-        q = quant_factor * quantile(v, w, quant) + quant_offset
-        push!(qs, q)
-        push!(med, median(v))
-        if comp_vec_q(vi, q)
-            push!(outliers, i)
+        if length(v)>0
+            q = quant_factor * quantile(v, w, quant) + quant_offset
+            push!(qs, q)
+            push!(med, median(v))
+            if comp_vec_q(vi, q)
+                push!(outliers, i)
+            end
         end
     end
     if verbose
@@ -288,8 +290,8 @@ end
 #############
 # Saving and Loading
 function filename(ep::ExpImgs)
-    @unpack dir, thin_num, ns = ep
-    "$(dir)-thin$(thin_num)-ns$(length(ns))"
+    @unpack dir, thin_num, ns, algo = ep
+    "$(dir)-thin$(thin_num)-ns$(length(ns))-$(algo)"
 end
 function save_lines(tops, bottoms, ep; overwrite=false)
     fln = filename(ep)*".jld"
@@ -309,4 +311,24 @@ function save_lines(fln, tops, bottoms, ep)
     end
     nothing
 end
-load_lines(fln) = tuple(values(JLD.load(fln))...)
+function load_lines(fln)
+    tmp = JLD.load(fln)
+    return tmp["tops"], tmp["bottoms"], tmp["ep"]
+end
+load_lines(ep::ExpImgs) = load_lines(filename(ep)*".jld")
+
+
+###############
+# Filtering
+
+"""
+Lowpass filter with a cutoff at `wavelength`,
+expressed as ratio of wavelength/image width.
+"""
+function lowpass_filter(lines, wavelength=0.03)
+    wavelength_pix = wavelength*size(lines,1)
+    @show frq = 2/wavelength_pix
+    responsetype = DSP.Lowpass(frq)
+    designmethod = DSP.Butterworth(4)
+    round.(Int, DSP.filtfilt(DSP.digitalfilter(responsetype, designmethod), lines))
+end

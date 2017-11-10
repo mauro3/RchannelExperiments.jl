@@ -14,8 +14,7 @@ import PyCall
 PyCall.@pyimport matplotlib.animation as anim
 using StatsBase
 using Parameters
-
-include("helpers.jl")
+import DSP
 
 export ExpImgs, channel_width, prep_img
 
@@ -40,6 +39,7 @@ This holds all data needed to process pictures from one Experiment.
     median_filter_region::Tuple{Int,Int} = (3,7) # (top-bottom, left-right)
 end
 
+include("helpers.jl")
 include("preparation.jl")
 include("width.jl")
 include("plotting.jl")
