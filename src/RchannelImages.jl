@@ -20,7 +20,8 @@ export ExpImgs, channel_width, prep_img
 
 
 """
-All parameters needed to turn pixels into meters, assuming an image without distortion.
+All parameters needed to turn pixels into meters, assuming
+an image without distortion.
 """
 @with_kw struct Pixel2Meter @deftype Float64
     h1 # distance surface to pupil of camera
@@ -34,7 +35,8 @@ end
 
 
 """
-This holds all data needed to process pictures from one Experiment.
+This holds all data needed to process the automatic pictures
+from one Experiment.
 """
 @with_kw struct ExpImgs @deftype Int
     dir::String
@@ -42,9 +44,7 @@ This holds all data needed to process pictures from one Experiment.
     p2::Tuple{Int,Int}
     halfheight_crop = 1200
     thin_num = 4
-    siz::Tuple{Int,Int} = (fld1(2*halfheight_crop+1,thin_num),
-                           fld1(round(Int, sqrt((p2[1]-p1[1])^2 + (p2[2]-p1[2])^2)) +1, thin_num) )
-    color_loc::Tuple{Int,Int} = (fld1(siz[1],2), fld1(siz[2],2))
+    color_loc::Tuple{Float64,Float64} = (0.5,0.5) # location of where to pic the color (in original image, coords 0..1)
     ns::Vector{Int}
     minhalfwidth_orig  # minimal half-width of R-channel in pixels of original image
     algo::Symbol=[:both, :thresh, :edge][1]
@@ -53,6 +53,34 @@ This holds all data needed to process pictures from one Experiment.
     gap = 19
     median_filter_region::Tuple{Int,Int} = (3,7) # (top-bottom, left-right)
     p2m::Pixel2Meter
+end
+function Base.size(ep::ExpImgs)
+    @unpack halfheight_crop, thin_num, p1, p2 = ep
+    return fld1(2*halfheight_crop+1,thin_num), fld1(round(Int, sqrt((p2[1]-p1[1])^2 + (p2[2]-p1[2])^2)) +1, thin_num)
+end
+
+function image_files(ep::ExpImgs)
+    @unpack dir, ns = ep
+    ["$dir/$f" for f in readdir(dir)][ns]
+end
+"""
+Hold the result from the processing
+"""
+@with_kw struct ExpImgsResults
+    ep::ExpImgs
+    center_dist::Vector{Int}
+    ts::Matrix{Int} # tops
+    bs::Matrix{Int} # bottoms
+    ts_dist::Matrix{Float64}
+    bs_dist::Matrix{Float64}
+    # products
+    dia_mean::Vector{Float64} # mean diameter
+    dia_quant::Matrix{Float64} # 10%, 50%, 90% quantiles
+    scalloping::Vector{Float64} # scalloping factor
+    tb_cor::Vector{Float64}
+    # images
+    thumbs::Vector{Any} # thumbnail images
+    imgs::Vector{Any} # full images
 end
 
 include("optics.jl")

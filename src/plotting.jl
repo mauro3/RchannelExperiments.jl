@@ -46,7 +46,7 @@ function plot_all_n_new(ep::ExpImgs, tops, bottoms;
                         legend=false)
     P.figure()
     for i=1:length(ep.ns)
-        img = prep_img(i, ep)
+        img, _ = prep_img(i, ep)
         plot_all_n_new(img, tops[:,i], bottoms[:,i],
                        col=col, label=label, title=title)
         P.draw()
@@ -89,20 +89,24 @@ end
 
 # https://brushingupscience.wordpress.com/2016/06/21/matplotlib-animations-the-easy-way/
 # https://genkuroki.github.io/documents/Jupyter/20170624%20Examples%20of%20animations%20in%20Julia%20by%20PyPlot%20and%20matplotlib.animation.html
-function animate_line(tops, bottoms, ep)
+function animate_res(res; image=[:none,:thumb,:img][1], save=false)
+    @unpack ep, ts, bs, thumbs, imgs = res
     min_alpha = 0.2
     fac_alpha = 0.8
     c = "b"
-    tops = top2ind(tops, ep)
-    bottoms = bottom2ind(bottoms, ep)
+    ts = top2ind(ts, ep)
+    bs = bottom2ind(bs, ep)
     fig, ax = P.subplots(figsize=(5, 3))
-    ax[:set](xlim=(1, ep.siz[2]), ylim=(1, ep.siz[1]))
+    greys =  P.get_cmap("Greys")
+    ax[:set](xlim=(1, size(ep)[2]), ylim=(1, size(ep)[1]))
     ax[:invert_yaxis]()
 
-    pts = 1:ep.siz[2]
-    lines_t = ax[:plot](pts,tops[:,1], c=c)
+    image==:thumb && ax[:imshow](thumbs[1], extent=(1,size(ep)[1],1,size(ep)[2]),
+                                 aspect="equal", cmap=greys)
+    pts = 1:size(ep)[2]
+    lines_t = ax[:plot](pts,ts[:,1], c=c)
     lines_t[end][:set_alpha](1)
-    lines_b = ax[:plot](pts,bottoms[:,1], c=c)
+    lines_b = ax[:plot](pts,bs[:,1], c=c)
     lines_b[end][:set_alpha](1)
     ii = 1
     function ani_frame(i)
@@ -114,15 +118,15 @@ function animate_line(tops, bottoms, ep)
             a = l[:get_alpha]()
             l[:set_alpha](max(min_alpha, a*fac_alpha))
         end
-        append!(lines_t, ax[:plot](pts,tops[:,i], c=c))
-        append!(lines_b, ax[:plot](pts,bottoms[:,i], c=c))
+        append!(lines_t, ax[:plot](pts,ts[:,i], c=c))
+        append!(lines_b, ax[:plot](pts,bs[:,i], c=c))
         lines_t[end][:set_alpha](1)
         lines_b[end][:set_alpha](1)
         ii +=1
         ii>1000 && error()
         [lines_t;lines_b]
     end
-    myanim = anim.FuncAnimation(fig, ani_frame, frames=2:size(tops,2), interval=200, repeat=false)
+    myanim = anim.FuncAnimation(fig, ani_frame, frames=2:size(ts,2), interval=200, repeat=false)
     fln = filename(ep)*".mp4"
-    myanim[:save](fln, bitrate=-1, extra_args=["-vcodec", "libx264", "-pix_fmt", "yuv420p"])
+    save && myanim[:save](fln, bitrate=-1, extra_args=["-vcodec", "libx264", "-pix_fmt", "yuv420p"])
 end

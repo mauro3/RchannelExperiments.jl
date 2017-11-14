@@ -293,29 +293,29 @@ function filename(ep::ExpImgs)
     @unpack dir, thin_num, ns, algo = ep
     "$(dir)-thin$(thin_num)-ns$(length(ns))-$(algo)"
 end
-function save_lines(tops, bottoms, ep; overwrite=false)
-    fln = filename(ep)*".jld"
+filename(res::ExpImgsResults) = filename(res.ep)
+"""
+    save_result(res::ExpImgsResults; overwrite=false, store_imgs=false)
+
+
+"""
+function save_result(res::ExpImgsResults; overwrite=false, store_imgs=false)
+    fln = filename(res)*".jld"
     if isfile(fln) && !overwrite
-        warn("File exists, not saving!")
+        warn("File exists and overwrite==false, not saving!")
         return nothing
     end
-    save_lines(fln, tops, bottoms, ep)
-end
-
-function save_lines(fln, tops, bottoms, ep)
+    if !store_imgs && length(res.imgs)>0
+        res = ExpImgsResults(res,
+                             imgs=[])
+    end
     JLD.jldopen(fln, "w") do file
-        #JLD.addrequire(file, RchannelImages)
-        file["tops"] = tops
-        file["bottoms"]= bottoms
-        file["ep"] = ep
+        file["res"] = res
     end
     nothing
 end
-function load_lines(fln)
-    tmp = JLD.load(fln)
-    return tmp["tops"], tmp["bottoms"], tmp["ep"]
-end
-load_lines(ep::ExpImgs) = load_lines(filename(ep)*".jld")
+load_result(fln) = JLD.load(fln)
+load_result(ep::ExpImgs) = load_result(filename(ep)*".jld")
 
 
 ###############

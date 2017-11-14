@@ -21,7 +21,29 @@ crop(img, left, right, down, up) = img[1+left:end-right,1+down:end-up]
 
 Thin an image
 """
-thin(img,step) = img[1:step:end,1:step:end]
+function thin(img,step, alg=[:imresize, :restrict, :subsampling][3])
+    if alg==:imresize
+        ## using filtering: a bit slow
+        sz = (length(1:step:size(img,1)), length(1:step:size(img,2)))
+        σ = maximum(map((o,n)->0.25*o/n, size(img), sz))
+        kern = KernelFactors.gaussian((σ,σ))   # from ImageFiltering
+        return imresize(imfilter(img, kern, NA()), sz)
+    elseif alg==:restrict
+        ### using restrict, slightly faster
+        l2 = log2(step)
+        @assert isinteger(l2) "Can only thin by power of 2."
+        for i=1:l2
+            s = size(img)
+            img = ImageFiltering.padarray(img, ImageFiltering.Pad(:reflect,1,1)) # does not work
+            img = ImageTransformations.restrict(img)[1:fld1(s[1],2),1:fld1(s[2],2)]
+        end
+        return img
+    elseif alg==:subsampling
+        ### just sub-sampling: causes aliasing
+        return img[1:step:end,1:step:end]
+    end
+    error()
+end
 
 """
     rotate_n_crop(img, ep::ExpImgs; verbose=false)
@@ -82,11 +104,11 @@ function prep_img(path::String, ep::ExpImgs; verbose=false)
     img_color = load(path);
     prep_img(img_color, ep; verbose=verbose)
 end
-function prep_img(img_color::AbstractArray, ep::ExpImgs; verbose=false)
+function prep_img(img_color::AbstractArray, ep::ExpImgs; verbose=false)::Tuple{Matrix{Float64}, Int}
     @unpack p1, p2, halfheight_crop, thin_num = ep
     img_color, center_dist = rotate_n_crop(img_color, p1, p2, halfheight_crop, verbose=verbose)
     img_color = thin(img_color, thin_num);
-    @assert size(img_color)==ep.siz
+    @assert size(img_color)==size(ep) "size(img_color)=$(size(img_color)) not equal size(ep)=$(size(ep))"
     # calculate the difference in color
     img = colordiffit(img_color, ep, verbose=verbose);
     return img, center_dist
@@ -98,8 +120,8 @@ end
 Use `colordiff` make an image of perceived color difference
 """
 function colordiffit(img_color, ep::ExpImgs; verbose=false)
-    loc = ep.color_loc
-    c0 = img_color[loc...]
+    loc1, loc2 = round.(Int, (size(img_color,1)*ep.color_loc[1], size(img_color,1)*ep.color_loc[2]))
+    c0 = img_color[loc1,loc2]
     if verbose
         guidict = imshow(img_color)
         dp = size(img_color,1)÷50

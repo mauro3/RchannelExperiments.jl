@@ -1,7 +1,7 @@
 #########
 # Width
 getmid(img) = fld1(size(img,1),2)
-getmid(ep::ExpImgs) = fld1(ep.siz[1],2)
+getmid(ep::ExpImgs) = fld1(size(ep)[1],2)
 
 top2ind(top, img_or_ep) = getmid(img_or_ep) - top + 1
 bottom2ind(bottom, img_or_ep) = bottom + getmid(img_or_ep)
@@ -256,44 +256,61 @@ Returns the best of both outlines for all images in a ep.  Returns
 """
 
 function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
-                       overwrite=false)
+                       overwrite=false, store_imgs=false)
     @unpack dir, ns, p1, p2, thin_num, algo,
             minhalfwidth_orig, gauss_w, quant, gap, median_filter_region = ep
     minhalfwidth = minhalfwidth_orig÷thin_num
 
-    imgs = ["$dir/$f" for f in readdir(dir)];
     tops = Int[]
     bottoms = Int[]
     last_top = [minhalfwidth]
     last_bottom = [minhalfwidth]
-    ncol = ep.siz[2]
+    ncol = size(ep)[2]
+    center_dists = Int[]
+    thumbs = []
+    imgs = []
 #    @showprogress for n in ns
-    for n in ns
-        img, center_dist = prep_img(imgs[n], ep; verbose=vverbose)
-        t, b = _channel_width(img, last_top, last_bottom, ep, "$n:  $(imgs[n])",
+    for (n,fl) in zip(ns, image_files(ep))
+        img, center_dist = prep_img(fl, ep; verbose=vverbose)
+        t, b = _channel_width(img, last_top, last_bottom, ep, "$n:  $fl",
                              algo,
                              verbose=verbose,
                              vverbose=vverbose)
         if verbose && algo!=:both
             plot_all_n_new(img, t, b, t, b, t, b;
-                           title="$n:  $(imgs[n])")
+                           title="$n:  $fl")
             P.draw()
         end
         last_top = t
         last_bottom = b
         append!(tops, t)
         append!(bottoms,b)
+        push!(center_dists, center_dist)
+        push!(thumbs, thin(img, 16))
+        store_imgs && push!(imgs, img)
     end
-    tops = reshape(tops, ep.siz[2], length(tops)÷ep.siz[2])
-    bottoms = reshape(bottoms, ep.siz[2], length(tops)÷ep.siz[2])
-    saveit && save_lines(tops, bottoms, ep, overwrite=overwrite)
-    return tops, bottoms, pixel2meter.(tops+center_dist, ep), pixel2meter.(bottoms-center_dist, ep)
+    tops = reshape(tops, size(ep)[2], length(tops)÷size(ep)[2])
+    bottoms = reshape(bottoms, size(ep)[2], length(tops)÷size(ep)[2])
+    ts_dist = pixel2meter.(tops.+center_dists', ep)
+    bs_dist = pixel2meter.(bottoms.-center_dists', ep)
+    res = ExpImgsResults(ep,
+                         center_dists,
+                         tops,
+                         bottoms,
+                         ts_dist,
+                         bs_dist,
+                         rchannel_stats(ts_dist,bs_dist)...,
+                         thumbs,
+                         imgs
+                         )
+    saveit && save_result(res, overwrite=overwrite)
+    return res
 end
 
 
 function _channel_width(img, last_top, last_bottom, ep::ExpImgs, title, algo;
                        verbose=false, vverbose=false)
-    @unpack color_loc, minhalfwidth_orig, gauss_w, quant, gap, median_filter_region, thin_num = ep
+    @unpack minhalfwidth_orig, gauss_w, quant, gap, median_filter_region, thin_num = ep
     minhalfwidth = minhalfwidth_orig÷thin_num
 
     if length(last_bottom)==1
@@ -307,7 +324,7 @@ function _channel_width(img, last_top, last_bottom, ep::ExpImgs, title, algo;
     minhalfwidth_cur = minhalfwidth
     if algo in [:both, :thresh]
         top_t, bottom_t, tot_t = channel_width_thresholding(
-            img, color_loc, median_filter_region; verbose=false)#vverbose)
+            img, (size(img,1)÷2, size(img,2)÷2), median_filter_region; verbose=false)#vverbose)
         algo==:thresh && return top_t, bottom_t
     end
     if algo in [:both, :edge]
@@ -473,8 +490,16 @@ function pick_next_point(v1, v2, vp, vpp, v_old)
 end
 
 
-# function rchannel_stats(img, ep::ExpImgs, m_per_px)
-#     w, off = channel_width(img, ep, m_per_px)
-#     scalopping = (maximum(w)-minimum(w))/mean(w)
-#     return mean(w), std(w), scalopping
-# end
+function rchannel_stats(tdist, bdist)
+    d = tdist+bdist
+    dia_mean = mean(d)
+    dia_quant = quantile(d, [0.1, 0.5, 0.9])
+    scalopping = (dia_quant[3]-dia_quant[1])/dia_quant[2]
+    tb_cor = cor(tdist, bdist)
+    return dia_mean, dia_quant, scalopping, tb_cor
+end
+function rchannel_stats(tdists::Matrix, bdists::Matrix)::Tuple{
+    Vector{Float64}, Matrix{Float64}, Vector{Float64}, Vector{Float64}}
+    tmp = hcat([[rchannel_stats(tdists[:,i],bdists[:,i])...] for i=1:size(bdists,2)]...)
+    return tmp[1,:], hcat(tmp[2,:]...), tmp[3,:], tmp[4,:]
+end
