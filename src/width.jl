@@ -245,9 +245,14 @@ end
 
 """
     channel_width(ep::ExpImgs; verbose=false)
-    channel_width(img_, last_top, last_bottom, eq::ExpImgs; verbose=false)
 
-Try to return the best of both outlines for one image or all of a ep)
+Returns the best of both outlines for all images in a ep.  Returns
+
+- tops, bottoms: pixel distance to top and bottom outline in terms of
+  pixels of the cropped image (i.e. not corrected with center_dist)
+- t_dist, b_dist: distance in meters to top and bottom from a line
+  through the original image center and parallel to (ep.p1, ep.p2).
+
 """
 
 function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
@@ -264,7 +269,7 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
     ncol = ep.siz[2]
 #    @showprogress for n in ns
     for n in ns
-        img, midoffset = prep_img(imgs[n], ep; verbose=vverbose)
+        img, center_dist = prep_img(imgs[n], ep; verbose=vverbose)
         t, b = _channel_width(img, last_top, last_bottom, ep, "$n:  $(imgs[n])",
                              algo,
                              verbose=verbose,
@@ -276,16 +281,13 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
         end
         last_top = t
         last_bottom = b
-        # correct offset from middle due to image rotation
-        t = t .+ round.(Int, midoffset)
-        b = b .- round.(Int, midoffset)
         append!(tops, t)
         append!(bottoms,b)
     end
     tops = reshape(tops, ep.siz[2], length(tops)÷ep.siz[2])
     bottoms = reshape(bottoms, ep.siz[2], length(tops)÷ep.siz[2])
     saveit && save_lines(tops, bottoms, ep, overwrite=overwrite)
-    return pixel2meter.(tops, ep), pixel2meter.(bottoms, ep)
+    return tops, bottoms, pixel2meter.(tops+center_dist, ep), pixel2meter.(bottoms-center_dist, ep)
 end
 
 
