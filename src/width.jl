@@ -261,30 +261,35 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
     bottoms = Int[]
     last_top = [minhalfwidth]
     last_bottom = [minhalfwidth]
+    ncol = ep.siz[2]
 #    @showprogress for n in ns
     for n in ns
-        img = prep_img(imgs[n], ep; verbose=vverbose)
-        t, b = channel_width(img, last_top, last_bottom, ep, "$n:  $(imgs[n])",
-                                   algo,
-                                   verbose=verbose,
-                                   vverbose=vverbose)
+        img, midoffset = prep_img(imgs[n], ep; verbose=vverbose)
+        t, b = _channel_width(img, last_top, last_bottom, ep, "$n:  $(imgs[n])",
+                             algo,
+                             verbose=verbose,
+                             vverbose=vverbose)
         if verbose && algo!=:both
             plot_all_n_new(img, t, b, t, b, t, b;
                            title="$n:  $(imgs[n])")
+            P.draw()
         end
         last_top = t
         last_bottom = b
+        # correct offset from middle due to image rotation
+        t = t .+ round.(Int, midoffset)
+        b = b .- round.(Int, midoffset)
         append!(tops, t)
         append!(bottoms,b)
     end
     tops = reshape(tops, ep.siz[2], length(tops)÷ep.siz[2])
     bottoms = reshape(bottoms, ep.siz[2], length(tops)÷ep.siz[2])
     saveit && save_lines(tops, bottoms, ep, overwrite=overwrite)
-    return tops, bottoms
+    return pixel2meter.(tops, ep), pixel2meter.(bottoms, ep)
 end
 
 
-function channel_width(img, last_top, last_bottom, ep::ExpImgs, title, algo;
+function _channel_width(img, last_top, last_bottom, ep::ExpImgs, title, algo;
                        verbose=false, vverbose=false)
     @unpack color_loc, minhalfwidth_orig, gauss_w, quant, gap, median_filter_region, thin_num = ep
     minhalfwidth = minhalfwidth_orig÷thin_num
@@ -466,8 +471,8 @@ function pick_next_point(v1, v2, vp, vpp, v_old)
 end
 
 
-function rchannel_stats(img, ep::ExpImgs, m_per_px)
-    w = channel_width(img, ep, m_per_px)
-    scalopping = (maximum(w)-minimum(w))/mean(w)
-    return mean(w), std(w), scalopping
-end
+# function rchannel_stats(img, ep::ExpImgs, m_per_px)
+#     w, off = channel_width(img, ep, m_per_px)
+#     scalopping = (maximum(w)-minimum(w))/mean(w)
+#     return mean(w), std(w), scalopping
+# end

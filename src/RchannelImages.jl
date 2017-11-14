@@ -18,6 +18,21 @@ import DSP
 
 export ExpImgs, channel_width, prep_img
 
+
+"""
+All parameters needed to turn pixels into meters, assuming an image without distortion.
+"""
+@with_kw struct Pixel2Meter @deftype Float64
+    h1 # distance surface to pupil of camera
+    h2 # thickness of water-pool or perspex
+    h3 # depth from bottom of pool to r-channel center
+    n1 = 1.0
+    n2 = [1.339, 1.48][1] # [water, perspex]
+    n3 = 1.31 # ice
+    ppm::Float64 # pixel (of full resolution) per meter at surface
+end
+
+
 """
 This holds all data needed to process pictures from one Experiment.
 """
@@ -37,8 +52,10 @@ This holds all data needed to process pictures from one Experiment.
     quant::Float64=0.6
     gap = 19
     median_filter_region::Tuple{Int,Int} = (3,7) # (top-bottom, left-right)
+    p2m::Pixel2Meter
 end
 
+include("optics.jl")
 include("helpers.jl")
 include("preparation.jl")
 include("width.jl")
