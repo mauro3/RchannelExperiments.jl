@@ -61,6 +61,7 @@ from one Experiment.
     gap = 19
     median_filter_region::Tuple{Int,Int} = (3,7) # (top-bottom, left-right)
     p2m::Pixel2Meter
+    extras::Dict=Dict()
 end
 function Base.size(ep::ExpImgs)
     @unpack halfheight_crop, thin_num, p1, p2 = ep
@@ -90,7 +91,9 @@ Hold the result from the processing
     # images
     thumbs::Vector{Any} # thumbnail images
     imgs::Vector{Any} # full images
+    extras::Dict=Dict()
 end
+Base.length(res::ExpImgsResults) = length(res.capture_times)
 
 include("optics.jl")
 include("helpers.jl")

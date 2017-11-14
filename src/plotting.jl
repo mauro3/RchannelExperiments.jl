@@ -89,27 +89,35 @@ end
 
 # https://brushingupscience.wordpress.com/2016/06/21/matplotlib-animations-the-easy-way/
 # https://genkuroki.github.io/documents/Jupyter/20170624%20Examples%20of%20animations%20in%20Julia%20by%20PyPlot%20and%20matplotlib.animation.html
-function animate_res(res; image=[:none,:thumb,:img][1], save=false)
+function animate_res(res::ExpImgsResults; image=[:none,:thumb,:img][1], save=false, interval=200)
+    image==:img && error("Not implemented")
     @unpack ep, ts, bs, thumbs, imgs = res
+    scale = ep.thin_num/ep.p2m.ppm *100 # cm
     min_alpha = 0.2
     fac_alpha = 0.8
     c = "b"
-    ts = top2ind(ts, ep)
-    bs = bottom2ind(bs, ep)
-    fig, ax = P.subplots(figsize=(5, 3))
+    ts = top2ind(ts, ep)*scale
+    bs = bottom2ind(bs, ep)*scale
+    fig, ax = P.subplots(figsize=(5, 3), dpi=100)
     greys =  P.get_cmap("Greys")
-    ax[:set](xlim=(1, size(ep)[2]), ylim=(1, size(ep)[1]))
+    ax[:set](xlim=(0, size(ep)[2]*scale), ylim=(0, size(ep)[1]*scale))
+    ax[:set](xlabel="Along channel (cm)", ylabel="Across channel (cm)")
     ax[:invert_yaxis]()
 
-    image==:thumb && ax[:imshow](thumbs[1], extent=(1,size(ep)[1],1,size(ep)[2]),
-                                 aspect="equal", cmap=greys)
-    pts = 1:size(ep)[2]
+    if image==:thumb
+        im = ax[:imshow](thumbs[1], extent=(0,size(ep)[2]*scale,size(ep)[1]*scale,0),
+                         aspect="equal", cmap=greys)
+    end
+    pts = (0:size(ep)[2]-1)*scale
     lines_t = ax[:plot](pts,ts[:,1], c=c)
     lines_t[end][:set_alpha](1)
     lines_b = ax[:plot](pts,bs[:,1], c=c)
     lines_b[end][:set_alpha](1)
     ii = 1
     function ani_frame(i)
+        if image==:thumb
+            im[:set_array](thumbs[i])
+        end
         for l in lines_t
             a = l[:get_alpha]()
             l[:set_alpha](max(min_alpha, a*fac_alpha))
@@ -126,7 +134,30 @@ function animate_res(res; image=[:none,:thumb,:img][1], save=false)
         ii>1000 && error()
         [lines_t;lines_b]
     end
-    myanim = anim.FuncAnimation(fig, ani_frame, frames=2:size(ts,2), interval=200, repeat=false)
+    myanim = anim.FuncAnimation(fig, ani_frame, frames=2:size(ts,2), interval=interval, repeat=false)
     fln = filename(ep)*".mp4"
     save && myanim[:save](fln, bitrate=-1, extra_args=["-vcodec", "libx264", "-pix_fmt", "yuv420p"])
+end
+
+function plot_res(res::ExpImgsResults; tscale=60)
+    P.figure()
+    t, dia_mean, dia_quant, scalloping, tb_cor = get_time_series(res)
+    dia_std = std(res.ts_dist+res.bs_dist,1)'
+    scalloping2 = dia_std./dia_mean
+    t ./= tscale
+    ax = P.subplot(2,1,1)
+    P.plot(t, dia_mean, label="mean")
+    P.plot(t, dia_quant[:,2], label="median")
+    P.plot(t, dia_quant[:,1], label="10%")
+    P.plot(t, dia_quant[:,3], label="90%")
+    P.legend()
+    P.ylabel("diameter (m)")
+    P.subplot(2,1,2,sharex=ax)
+    P.plot(t, scalloping, label="scallop quantile (0..2)")
+    P.plot(t, scalloping2, label="scallop std/mean (0..2)")
+    P.plot(t, tb_cor, label="symmetry (correlation) (-1..1)")
+    P.legend()
+    st = res.ep.experiment_start
+    P.xlabel("Time period since $(Dates.Time(st)) on $(Dates.Date(st)) ($(tscale)s)")
+    P.ylabel("factor ()")
 end

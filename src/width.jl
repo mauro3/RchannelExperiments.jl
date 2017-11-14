@@ -12,12 +12,15 @@ bottom_inds(img_or_ep) = getmid(img_or_ep)+1:size(img,1)
 # width via color tresholding
 
 
-function findtrough(img; verbose=false)
+function findtrough(img, title; verbose=false)
     nbins = 100
     hi = fit(Histogram, img[:], closed=:left, nbins=nbins)
     peaks, ips, proms, doms = findpeaks(-hi.weights[1:(end-end÷4)])
     i = findmax(proms[ips.<(nbins÷2)])[2] # look only if first half of histogram
-    proms[i]<length(img)/500 && error("No color boundary found.")
+    if proms[i]<length(img)/500
+        warn("No color boundary found in $title")
+        return 0
+    end
     verbose && P.plot(1:length(hi.weights), -hi.weights)
     #verbose && P.bar(hi.edges[1][1:end-1], hi.weights)
     verbose && @show ips[i]
@@ -40,8 +43,10 @@ function keep_only_big_regions(img, loc, siz=round(Int,(sqrt(length(img))/20)^2)
 end
 
 
-function channel_width_thresholding(img_, loc, median_filter_region; verbose=false)
-    img_ = img_.>findtrough(img_, verbose=verbose);
+function channel_width_thresholding(img_, loc, median_filter_region, title; verbose=false)
+    trough = findtrough(img_, title, verbose=verbose)
+    trough==0 && return zeros(Int,size(img_,2)),zeros(Int,size(img_,2)),zeros(Int,size(img_,2))
+    img_ = img_.>trough
     if median_filter_region!=(0,0)
         img_ = median_filter(img_, median_filter_region)
     end
@@ -259,6 +264,8 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
                        overwrite=false, store_imgs=false)
     @unpack dir, ns, p1, p2, thin_num, algo,
             minhalfwidth_orig, gauss_w, quant, gap, median_filter_region = ep
+
+    println("\n Figuring out R-channel width for pictures in dir: $dir\n")
     minhalfwidth = minhalfwidth_orig÷thin_num
 
     tops = Int[]
@@ -270,8 +277,7 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
     thumbs = []
     imgs = []
     capture_times = DateTime[]
-#    @showprogress for n in ns
-    for (n,fl) in zip(ns, image_files(ep))
+    @showprogress for (n,fl) in zip(ns, image_files(ep))
         img, center_dist, capture_time = prep_img(fl, ep; verbose=vverbose)
         t, b = _channel_width(img, last_top, last_bottom, ep, "$n:  $fl",
                              algo,
@@ -304,7 +310,8 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
                          bs_dist,
                          rchannel_stats(ts_dist,bs_dist)...,
                          thumbs,
-                         imgs
+                         imgs,
+                         Dict()
                          )
     saveit && save_result(res, overwrite=overwrite)
     return res
@@ -327,69 +334,82 @@ function _channel_width(img, last_top, last_bottom, ep::ExpImgs, title, algo;
     minhalfwidth_cur = minhalfwidth
     if algo in [:both, :thresh]
         top_t, bottom_t, tot_t = channel_width_thresholding(
-            img, (size(img,1)÷2, size(img,2)÷2), median_filter_region; verbose=false)#vverbose)
-        algo==:thresh && return top_t, bottom_t
+            img, (size(img,1)÷2, size(img,2)÷2), median_filter_region, title; verbose=false)#vverbose)
+        if algo==:thresh
+            new_top, new_bottom = tot_t, bottom_t
+        end
     end
     if algo in [:both, :edge]
         top_e, bottom_e, tot_e = channel_width_edgedetection(
             img, minhalfwidth_cur, gauss_w, quant, gap; verbose=vverbose)
-        algo==:edge && return top_e, bottom_e
-    else
-        error("algo is $algo")
-    end
-    # now produce a best vector somehow:
-
-    # Go through to find points of agreement which are farther than v_old.
-    # Of those pick the closest to v_old.
-    tv, bv = -1, -1
-    ta, ba = 10^10, 10^10
-    ti, bi = 0, 0
-    for i=1:length(top_e)
-        tmp_,vv = how_close(top_t[i], top_e[i], last_top[i])
-        if tmp_<ta
-            ta = tmp_
-            ti = i
-            tv = vv
-        end
-        tmp_,vv = how_close(bottom_t[i], bottom_e[i], last_bottom[i])
-        if tmp_<ba
-            ba = tmp_
-            bi = i
-            bv = vv
+        if algo==:edge
+            new_top, new_bottom = tot_e, bottom_e
         end
     end
-    @assert tv>0
-    @assert bv>0
-
-    new_top = zeros(last_top)
-    new_top[ti] = tv
-    if ti<length(new_top)
-        new_top[ti+1] = pick_next_point(top_t[ti+1], top_e[ti+1], new_top[ti], last_top[ti])
-        for i=ti+2:length(new_top)
-            new_top[i] = pick_next_point(top_t[i], top_e[i], new_top[i-1], new_top[i-2], last_top[i])
-        end
-    end
-    if ti>1
-        new_top[ti-1] = pick_next_point(top_t[ti-1], top_e[ti-1], new_top[ti], last_top[ti])
-        for i=ti-2:-1:1
-            new_top[i] = pick_next_point(top_t[i], top_e[i], new_top[i+1], new_top[i+2], last_top[i])
-        end
+    if !(algo in [:both, :edge, :thresh])
+        error("algo=$algo not recognized")
     end
 
-    new_bottom = zeros(last_bottom)
-    new_bottom[bi] = bv
-    if bi<length(new_bottom)
-        # start
-        new_bottom[bi+1] = pick_next_point(bottom_t[bi+1], bottom_e[bi+1], new_bottom[bi], last_bottom[bi])
-        for i=bi+2:length(new_bottom)
-            new_bottom[i] = pick_next_point(bottom_t[i], bottom_e[i], new_bottom[i-1], new_bottom[i-2], last_bottom[i])
+    if algo==:both
+        # now produce a best vector somehow:
+
+        # Go through to find points of agreement which are farther than v_old.
+        # Of those pick the closest to v_old, this will serve as starting point
+        tv, bv = -1, -1
+        ta, ba = 10^10, 10^10
+        ti, bi = 0, 0
+        for i=1:length(top_e)
+            tmp_,vv = how_close(top_t[i], top_e[i], last_top[i])
+            if tmp_<ta
+                ta = tmp_
+                ti = i
+                tv = vv
+            end
+            tmp_,vv = how_close(bottom_t[i], bottom_e[i], last_bottom[i])
+            if tmp_<ba
+                ba = tmp_
+                bi = i
+                bv = vv
+            end
         end
-    end
-    if bi>1
-        # start
-        new_bottom[bi-1] = pick_next_point(bottom_t[bi-1], bottom_e[bi-1], new_bottom[bi], last_bottom[bi])
-        for i=bi-2:-1:1
-            new_bottom[i] = pick_next_point(bottom_t[i], bottom_e[i], new_bottom[i+1], new_bottom[i+2], last_bottom[i])
+        if tv<1
+            # no starting point found!
+            error("no starting point found for tops in: $title")
+        end
+        if bv<1
+            error("no starting point found for bottoms in: $title")
+        end
+
+        new_top = zeros(last_top)
+        new_top[ti] = tv
+        if ti<length(new_top)
+            new_top[ti+1] = pick_next_point(top_t[ti+1], top_e[ti+1], new_top[ti], last_top[ti])
+            for i=ti+2:length(new_top)
+                new_top[i] = pick_next_point(top_t[i], top_e[i], new_top[i-1], new_top[i-2], last_top[i])
+            end
+        end
+        if ti>1
+            new_top[ti-1] = pick_next_point(top_t[ti-1], top_e[ti-1], new_top[ti], last_top[ti])
+            for i=ti-2:-1:1
+                new_top[i] = pick_next_point(top_t[i], top_e[i], new_top[i+1], new_top[i+2], last_top[i])
+            end
+        end
+
+        new_bottom = zeros(last_bottom)
+        new_bottom[bi] = bv
+        if bi<length(new_bottom)
+            # start
+            new_bottom[bi+1] = pick_next_point(bottom_t[bi+1], bottom_e[bi+1], new_bottom[bi], last_bottom[bi])
+            for i=bi+2:length(new_bottom)
+                new_bottom[i] = pick_next_point(bottom_t[i], bottom_e[i], new_bottom[i-1], new_bottom[i-2], last_bottom[i])
+            end
+        end
+        if bi>1
+            # start
+            new_bottom[bi-1] = pick_next_point(bottom_t[bi-1], bottom_e[bi-1], new_bottom[bi], last_bottom[bi])
+            for i=bi-2:-1:1
+                new_bottom[i] = pick_next_point(bottom_t[i], bottom_e[i], new_bottom[i+1], new_bottom[i+2], last_bottom[i])
+            end
         end
     end
 
@@ -496,8 +516,10 @@ end
 function rchannel_stats(tdist, bdist)
     d = tdist+bdist
     dia_mean = mean(d)
+    dia_std = std(d)
     dia_quant = quantile(d, [0.1, 0.5, 0.9])
     scalopping = (dia_quant[3]-dia_quant[1])/dia_quant[2]
+    scalopping2 = dia_std./dia_mean
     tb_cor = cor(tdist, bdist)
     return dia_mean, dia_quant, scalopping, tb_cor
 end

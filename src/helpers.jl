@@ -1,4 +1,30 @@
+"""
+    elapsed_time(res, i)
 
+Elapsed time in seconds for i-th picture
+"""
+elapsed_time(res::ExpImgsResults, i)::Float64 =
+    (Dates.Second(res.capture_times[i] - res.ep.experiment_start)).value
+
+"""
+    get_time_series(res::ExpImgsResults)
+
+Get time series data as matrix:
+- time
+- mean diameter
+- median diameter
+- 10% quantile
+- 90% quantile
+- scalloping
+- symmetry
+"""
+function get_time_series(res::ExpImgsResults)
+    @unpack dia_mean, dia_quant, scalloping, tb_cor = res
+    t = elapsed_time.(res, 1:length(res))
+    return t, dia_mean, dia_quant', scalloping, tb_cor
+end
+
+"Image median filter"
 median_filter(img, window=(3,3)) = mapwindow(median!, img, window)
 
 #################
@@ -300,7 +326,7 @@ filename(res::ExpImgsResults) = filename(res.ep)
 
 """
 function save_result(res::ExpImgsResults; overwrite=false, store_imgs=false)
-    fln = filename(res)*".jld"
+    fln = "output/"*filename(res)*".jld"
     if isfile(fln) && !overwrite
         warn("File exists and overwrite==false, not saving!")
         return nothing
