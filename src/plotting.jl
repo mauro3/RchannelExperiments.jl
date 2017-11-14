@@ -46,7 +46,7 @@ function plot_all_n_new(ep::ExpImgs, tops, bottoms;
                         legend=false)
     P.figure()
     for i=1:length(ep.ns)
-        img, _ = prep_img(i, ep)
+        img, _, _ = prep_img(i, ep)
         plot_all_n_new(img, tops[:,i], bottoms[:,i],
                        col=col, label=label, title=title)
         P.draw()

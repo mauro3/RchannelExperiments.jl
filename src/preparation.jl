@@ -90,27 +90,29 @@ end
     prep_img(path::String, ep::ExpImgs; verbose=false)
     prep_img(img_color, ep; verbose=false)
 
-Prepare image by:
+Load and prepare image by:
 - rotate and crop
 - colordiff it
+
+Also returns:
+- center_dist -- distance to previous center
+- capture_time -- time of image capture
 """
-function prep_img(img_num::Int, ep::ExpImgs; verbose=false)
-    @unpack dir = ep
-    path = ["$dir/$f" for f in readdir(dir)][ep.ns[img_num]];
-    prep_img(path, ep; verbose=verbose)
-end
 function prep_img(path::String, ep::ExpImgs; verbose=false)
     verbose && println(path)
     img_color = load(path);
-    prep_img(img_color, ep; verbose=verbose)
+
+    dt = ImageMagick.magickinfo(path, "exif:DateTimeOriginal")["exif:DateTimeOriginal"]
+    _prep_img(img_color, ep; verbose=verbose)..., DateTime(dt, "yyyy:mm:dd HH:MM:SS") - ep.time_correction
 end
-function prep_img(img_color::AbstractArray, ep::ExpImgs; verbose=false)::Tuple{Matrix{Float64}, Int}
+function _prep_img(img_color::AbstractArray, ep::ExpImgs; verbose=false)::Tuple{Matrix{Float64}, Int}
     @unpack p1, p2, halfheight_crop, thin_num = ep
     img_color, center_dist = rotate_n_crop(img_color, p1, p2, halfheight_crop, verbose=verbose)
     img_color = thin(img_color, thin_num);
     @assert size(img_color)==size(ep) "size(img_color)=$(size(img_color)) not equal size(ep)=$(size(ep))"
     # calculate the difference in color
     img = colordiffit(img_color, ep, verbose=verbose);
+    # find EXIF time and correct it
     return img, center_dist
 end
 

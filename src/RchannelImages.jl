@@ -2,7 +2,7 @@
 
 module RchannelImages
 
-using Images, ImageView, ImageSegmentation
+using Images, ImageView, ImageSegmentation, ImageMagick
 using CoordinateTransformations, OffsetArrays
 using ProgressMeter
 import PyPlot
@@ -18,6 +18,10 @@ import DSP
 
 export ExpImgs, channel_width, prep_img
 
+## TODO:
+# @with_kw struct Exp
+#     experiment_start::Dates.DateTime # start-time of experiment.  Plotting will be relative to this time
+# end
 
 """
 All parameters needed to turn pixels into meters, assuming
@@ -39,7 +43,11 @@ This holds all data needed to process the automatic pictures
 from one Experiment.
 """
 @with_kw struct ExpImgs @deftype Int
+    # Directory holding the pictures
     dir::String
+    # time to be subtracted from EXIF:DateTimeOriginal to get correct time
+    time_correction::Dates.Period=Dates.Second(0)
+    experiment_start::Dates.DateTime # start-time of experiment.  Plotting will be relative to this time
     p1::Tuple{Int,Int}
     p2::Tuple{Int,Int}
     halfheight_crop = 1200
@@ -61,13 +69,14 @@ end
 
 function image_files(ep::ExpImgs)
     @unpack dir, ns = ep
-    ["$dir/$f" for f in readdir(dir)][ns]
+    ["$dir/$f" for f in readdir(dir) if lowercase(splitext(f)[2])==".jpg"][ns]
 end
 """
 Hold the result from the processing
 """
 @with_kw struct ExpImgsResults
     ep::ExpImgs
+    capture_times::Vector{DateTime}
     center_dist::Vector{Int}
     ts::Matrix{Int} # tops
     bs::Matrix{Int} # bottoms

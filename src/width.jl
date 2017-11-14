@@ -269,9 +269,10 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
     center_dists = Int[]
     thumbs = []
     imgs = []
+    capture_times = DateTime[]
 #    @showprogress for n in ns
     for (n,fl) in zip(ns, image_files(ep))
-        img, center_dist = prep_img(fl, ep; verbose=vverbose)
+        img, center_dist, capture_time = prep_img(fl, ep; verbose=vverbose)
         t, b = _channel_width(img, last_top, last_bottom, ep, "$n:  $fl",
                              algo,
                              verbose=verbose,
@@ -288,12 +289,14 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
         push!(center_dists, center_dist)
         push!(thumbs, thin(img, 16))
         store_imgs && push!(imgs, img)
+        push!(capture_times, capture_time)
     end
     tops = reshape(tops, size(ep)[2], length(tops)÷size(ep)[2])
     bottoms = reshape(bottoms, size(ep)[2], length(tops)÷size(ep)[2])
     ts_dist = pixel2meter.(tops.+center_dists', ep)
     bs_dist = pixel2meter.(bottoms.-center_dists', ep)
     res = ExpImgsResults(ep,
+                         capture_times,
                          center_dists,
                          tops,
                          bottoms,
