@@ -331,7 +331,7 @@ function save_result(res::ExpImgsResults; overwrite=false, store_imgs=false)
         warn("File exists and overwrite==false, not saving!")
         return nothing
     end
-    if !store_imgs && length(res.imgs)>0
+    if store_imgs==false && length(res.imgs)>0
         res = ExpImgsResults(res,
                              imgs=[])
     end

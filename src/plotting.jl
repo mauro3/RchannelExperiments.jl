@@ -1,10 +1,16 @@
 
-function imshow_file(fl, ep)
+function imshow_file(n::Int, ep; anno=false)
+    fl = image_files(ep, n)
+    imshow_file(fl, ep; anno=anno)
+end
+function imshow_file(fl::String, ep; anno=false)
     @unpack p1,p2 = ep
     img = Images.load(fl);
     guidict = ImageView.imshow(img);
-    ImageView.annotate!(guidict, ImageView.AnnotationPoint(p1[2], p1[1], shape='x', size=20, linewidth=2));
-    ImageView.annotate!(guidict, ImageView.AnnotationPoint(p2[2], p2[1], shape='x', size=20, linewidth=2));
+    if anno
+        ImageView.annotate!(guidict, ImageView.AnnotationPoint(p1[2], p1[1], shape='x', size=20, linewidth=2));
+        ImageView.annotate!(guidict, ImageView.AnnotationPoint(p2[2], p2[1], shape='x', size=20, linewidth=2));
+    end
 end
 
 
@@ -139,25 +145,31 @@ function animate_res(res::ExpImgsResults; image=[:none,:thumb,:img][1], save=fal
     save && myanim[:save](fln, bitrate=-1, extra_args=["-vcodec", "libx264", "-pix_fmt", "yuv420p"])
 end
 
-function plot_res(res::ExpImgsResults; tscale=60)
-    P.figure()
+function plot_res(res::ExpImgsResults; tscale=60, plot_ns=false, figsize=(15,15))
+    P.figure(figsize=figsize)
     t, dia_mean, dia_quant, scalloping, tb_cor = get_time_series(res)
     dia_std = std(res.ts_dist+res.bs_dist,1)'
     scalloping2 = dia_std./dia_mean
     t ./= tscale
-    ax = P.subplot(2,1,1)
-    P.plot(t, dia_mean, label="mean")
-    P.plot(t, dia_quant[:,2], label="median")
-    P.plot(t, dia_quant[:,1], label="10%")
-    P.plot(t, dia_quant[:,3], label="90%")
+    if plot_ns
+        t = res.ep.ns
+    end
+    ax = P.subplot(3,1,1)
+    P.plot(t, dia_mean, "-x", label="mean")
+    P.plot(t, dia_quant[:,2], "-x", label="median")
+    P.plot(t, dia_quant[:,1], "-x", label="10%")
+    P.plot(t, dia_quant[:,3], "-x", label="90%")
     P.legend()
     P.ylabel("diameter (m)")
-    P.subplot(2,1,2,sharex=ax)
-    P.plot(t, scalloping, label="scallop quantile (0..2)")
-    P.plot(t, scalloping2, label="scallop std/mean (0..2)")
-    P.plot(t, tb_cor, label="symmetry (correlation) (-1..1)")
+    P.subplot(3,1,2,sharex=ax)
+    P.plot(t, scalloping, "-x", label="scallop quantile (0..2)")
+    P.plot(t, scalloping2, "-x", label="scallop std/mean (0..2)")
     P.legend()
+    P.ylabel("factor ()")
+    P.subplot(3,1,3,sharex=ax)
+    P.plot(t, tb_cor, "-x", label="symmetry (correlation) (-1..1)")
+    P.ylabel("symmetry corr. ()")
     st = res.ep.experiment_start
     P.xlabel("Time period since $(Dates.Time(st)) on $(Dates.Date(st)) ($(tscale)s)")
-    P.ylabel("factor ()")
+
 end

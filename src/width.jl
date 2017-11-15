@@ -63,10 +63,8 @@ function channel_width_thresholding(img_, loc, median_filter_region, title; verb
     bottom = [findlast(img_3[mid+1:end,i]) for i=1:size(img_,2)]
 
     # remove outliers
-    quantile_filter!(top,
-                     0.05, 5, 1, 5, 6)
-    quantile_filter!(bottom,
-                     0.05, 5, 1, 5, 6)
+    quantile_filter!(top, 0.05, 5, 1, 5, 6)
+    quantile_filter!(bottom, 0.05, 5, 1, 5, 6)
 
     return top, bottom, top+bottom
 end
@@ -283,11 +281,6 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
                              algo,
                              verbose=verbose,
                              vverbose=vverbose)
-        if verbose && algo!=:both
-            plot_all_n_new(img, t, b, t, b, t, b;
-                           title="$n:  $fl")
-            P.draw()
-        end
         last_top = t
         last_bottom = b
         append!(tops, t)
@@ -313,7 +306,7 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
                          imgs,
                          Dict()
                          )
-    saveit && save_result(res, overwrite=overwrite)
+    saveit && save_result(res, overwrite=overwrite, store_imgs=store_imgs)
     return res
 end
 
@@ -333,17 +326,20 @@ function _channel_width(img, last_top, last_bottom, ep::ExpImgs, title, algo;
     # minhalfwidth_cur = max(min(minimum(last_top), minimum(last_bottom)) - minhalfwidth÷5, minhalfwidth)
     minhalfwidth_cur = minhalfwidth
     if algo in [:both, :thresh]
-        top_t, bottom_t, tot_t = channel_width_thresholding(
-            img, (size(img,1)÷2, size(img,2)÷2), median_filter_region, title; verbose=false)#vverbose)
+        top_t, bottom_t, tot_t = channel_width_thresholding(img,
+                                                            (size(img,1)÷2, size(img,2)÷2),
+                                                            median_filter_region, title;
+                                                            verbose=vverbose)
         if algo==:thresh
-            new_top, new_bottom = tot_t, bottom_t
+            new_top, new_bottom = top_t, bottom_t
         end
     end
     if algo in [:both, :edge]
-        top_e, bottom_e, tot_e = channel_width_edgedetection(
-            img, minhalfwidth_cur, gauss_w, quant, gap; verbose=vverbose)
+        top_e, bottom_e, tot_e = channel_width_edgedetection(img, minhalfwidth_cur,
+                                                             gauss_w, quant, gap;
+                                                             verbose=vverbose)
         if algo==:edge
-            new_top, new_bottom = tot_e, bottom_e
+            new_top, new_bottom = top_e, bottom_e
         end
     end
     if !(algo in [:both, :edge, :thresh])
@@ -423,9 +419,21 @@ function _channel_width(img, last_top, last_bottom, ep::ExpImgs, title, algo;
     new_bottom = round.(Int,mapwindow(mean, new_bottom, window))
 
     if verbose
-        plot_all_n_new(img, new_top, new_bottom, top_t, bottom_t, top_e, bottom_e;
-                        col="r", label="", title=title,
-                        legend=false)
+        if algo==:both
+            plot_all_n_new(img, new_top, new_bottom, top_t, bottom_t, top_e, bottom_e;
+                           col="r", label="", title=title,
+                           legend=false)
+        elseif algo==:edge
+            plot_all_n_new(img, new_top, new_bottom, top_e, bottom_e, top_e, bottom_e;
+                           col="r", label="", title=title,
+                           legend=false)
+        elseif algo==:thresh
+            plot_all_n_new(img, new_top, new_bottom, top_t, bottom_t, top_t, bottom_t;
+                           col="r", label="", title=title,
+                           legend=false)
+        else
+            error()
+        end
         P.draw()
     end
     return new_top, new_bottom

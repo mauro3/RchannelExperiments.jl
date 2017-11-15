@@ -68,9 +68,9 @@ function Base.size(ep::ExpImgs)
     return fld1(2*halfheight_crop+1,thin_num), fld1(round(Int, sqrt((p2[1]-p1[1])^2 + (p2[2]-p1[2])^2)) +1, thin_num)
 end
 
-function image_files(ep::ExpImgs)
-    @unpack dir, ns = ep
-    ["$dir/$f" for f in readdir(dir) if lowercase(splitext(f)[2])==".jpg"][ns]
+function image_files(ep::ExpImgs, nss=ep.ns)
+    @unpack dir = ep
+    ["$dir/$f" for f in readdir(dir) if lowercase(splitext(f)[2])==".jpg"][nss]
 end
 """
 Hold the result from the processing

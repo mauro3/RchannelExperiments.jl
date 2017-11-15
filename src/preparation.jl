@@ -122,12 +122,12 @@ end
 Use `colordiff` make an image of perceived color difference
 """
 function colordiffit(img_color, ep::ExpImgs; verbose=false)
-    loc1, loc2 = round.(Int, (size(img_color,1)*ep.color_loc[1], size(img_color,1)*ep.color_loc[2]))
+    loc1, loc2 = round.(Int, (size(img_color,1)*ep.color_loc[1], size(img_color,2)*ep.color_loc[2]))
     c0 = img_color[loc1,loc2]
     if verbose
         guidict = imshow(img_color)
         dp = size(img_color,1)÷50
-        annotate!(guidict, AnnotationBox(loc[2]+dp, loc[1]+dp, loc[2]-dp, loc[1]-dp, linewidth=2, color=RGB(0,0,1)))
+        annotate!(guidict, AnnotationBox(loc2+dp, loc1+dp, loc2-dp, loc1-dp, linewidth=2, color=RGB(0,0,1)))
     end
     colordiff.(img_color, c0)
 end
