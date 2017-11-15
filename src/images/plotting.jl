@@ -1,10 +1,10 @@
 
-function imshow_file(n::Int, ep; anno=false)
-    fl = image_files(ep, n)
-    imshow_file(fl, ep; anno=anno)
+function imshow_file(n::Int, exi; anno=false)
+    fl = image_files(exi, n)
+    imshow_file(fl, exi; anno=anno)
 end
-function imshow_file(fl::String, ep; anno=false)
-    @unpack p1,p2 = ep
+function imshow_file(fl::String, exi; anno=false)
+    @unpack p1,p2 = exi
     img = Images.load(fl);
     guidict = ImageView.imshow(img);
     if anno
@@ -47,12 +47,12 @@ function plot_all_n_new(img, top, bottom, top_t=top, bottom_t=bottom, top_e=top_
                       col=col, label=label, ax=ax,
                       legend=legend)
 end
-function plot_all_n_new(ep::ExpImgs, tops, bottoms;
+function plot_all_n_new(exi::ExpImgs, tops, bottoms;
                         col="r", label="", title="",
                         legend=false)
     P.figure()
-    for i=1:length(ep.ns)
-        img, _, _ = prep_img(i, ep)
+    for i=1:length(exi.ns)
+        img, _, _ = prep_img(i, exi)
         plot_all_n_new(img, tops[:,i], bottoms[:,i],
                        col=col, label=label, title=title)
         P.draw()
@@ -97,24 +97,24 @@ end
 # https://genkuroki.github.io/documents/Jupyter/20170624%20Examples%20of%20animations%20in%20Julia%20by%20PyPlot%20and%20matplotlib.animation.html
 function animate_res(res::ExpImgsResults; image=[:none,:thumb,:img][1], save=false, interval=200)
     image==:img && error("Not implemented")
-    @unpack ep, ts, bs, thumbs, imgs = res
-    scale = ep.thin_num/ep.p2m.ppm *100 # cm
+    @unpack exi, ts, bs, thumbs, imgs = res
+    scale = exi.thin_num/exi.p2m.ppm *100 # cm
     min_alpha = 0.2
     fac_alpha = 0.8
     c = "b"
-    ts = top2ind(ts, ep)*scale
-    bs = bottom2ind(bs, ep)*scale
+    ts = top2ind(ts, exi)*scale
+    bs = bottom2ind(bs, exi)*scale
     fig, ax = P.subplots(figsize=(5, 3), dpi=100)
     greys =  P.get_cmap("Greys")
-    ax[:set](xlim=(0, size(ep)[2]*scale), ylim=(0, size(ep)[1]*scale))
+    ax[:set](xlim=(0, size(exi)[2]*scale), ylim=(0, size(exi)[1]*scale))
     ax[:set](xlabel="Along channel (cm)", ylabel="Across channel (cm)")
     ax[:invert_yaxis]()
 
     if image==:thumb
-        im = ax[:imshow](thumbs[1], extent=(0,size(ep)[2]*scale,size(ep)[1]*scale,0),
+        im = ax[:imshow](thumbs[1], extent=(0,size(exi)[2]*scale,size(exi)[1]*scale,0),
                          aspect="equal", cmap=greys)
     end
-    pts = (0:size(ep)[2]-1)*scale
+    pts = (0:size(exi)[2]-1)*scale
     lines_t = ax[:plot](pts,ts[:,1], c=c)
     lines_t[end][:set_alpha](1)
     lines_b = ax[:plot](pts,bs[:,1], c=c)
@@ -141,7 +141,7 @@ function animate_res(res::ExpImgsResults; image=[:none,:thumb,:img][1], save=fal
         [lines_t;lines_b]
     end
     myanim = anim.FuncAnimation(fig, ani_frame, frames=2:size(ts,2), interval=interval, repeat=false)
-    fln = filename(ep)*".mp4"
+    fln = filename(exi)*".mp4"
     save && myanim[:save](fln, bitrate=-1, extra_args=["-vcodec", "libx264", "-pix_fmt", "yuv420p"])
 end
 
@@ -152,7 +152,7 @@ function plot_res(res::ExpImgsResults; tscale=60, plot_ns=false, figsize=(15,15)
     scalloping2 = dia_std./dia_mean
     t ./= tscale
     if plot_ns
-        t = res.ep.ns
+        t = res.exi.ns
     end
     ax = P.subplot(3,1,1)
     P.plot(t, dia_mean, "-x", label="mean")
@@ -169,7 +169,7 @@ function plot_res(res::ExpImgsResults; tscale=60, plot_ns=false, figsize=(15,15)
     P.subplot(3,1,3,sharex=ax)
     P.plot(t, tb_cor, "-x", label="symmetry (correlation) (-1..1)")
     P.ylabel("symmetry corr. ()")
-    st = res.ep.experiment_start
+    st = res.exi.experiment_start
     P.xlabel("Time period since $(Dates.Time(st)) on $(Dates.Date(st)) ($(tscale)s)")
 
 end

@@ -6,22 +6,22 @@
 #
 
 """
-    pixel2meter(pixels, ep::ExpImgs)
+    pixel2meter(pixels, exi::ExpImgs)
 
 This gives the pixel to meter conversion for the plane in which the
 R-channel lies.
 """
-function pixel2meter(pixels, ep::ExpImgs)
-    r1 = pixels/pixels_per_m(ep)
-    r1_to_R(r1, ep)
+function pixel2meter(pixels, exi::ExpImgs)
+    r1 = pixels/pixels_per_m(exi)
+    r1_to_R(r1, exi)
 end
 
-pixels_per_m(ep::ExpImgs) = ep.p2m.ppm/ep.thin_num
+pixels_per_m(exi::ExpImgs) = exi.p2m.ppm/exi.thin_num
 
 
 """
     r1_to_R(r1, p2m::Pixel2Meter)
-    r1_to_R(r1, ep::ExpImgs)
+    r1_to_R(r1, exi::ExpImgs)
 
 Transforms a distance as measured at the surface of the block into a
 distance inside the ice block.
@@ -33,8 +33,8 @@ Notes:
   http://optics.sgu.ru/_media/optics/staff/bashkatov/bashkatov_spie_03_5068_393.pdf
 - perspex is about 1.48
 """
-function r1_to_R(r1, ep::ExpImgs)
-    p2m = ep.p2m
+function r1_to_R(r1, exi::ExpImgs)
+    p2m = exi.p2m
     r1_to_R(r1, p2m.h1, p2m.h2, p2m.h3, p2m.n1, p2m.n2, p2m.n3)
 end
 function r1_to_R(r1, h1, h2, h3, n1=1.0, n2=[1.339,1.48][1], n3=1.31)

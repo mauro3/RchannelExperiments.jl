@@ -4,7 +4,7 @@
 Elapsed time in seconds for i-th picture
 """
 elapsed_time(res::ExpImgsResults, i)::Float64 =
-    (Dates.Second(res.capture_times[i] - res.ep.experiment_start)).value
+    (Dates.Second(res.capture_times[i] - res.exi.experiment_start)).value
 
 """
     get_time_series(res::ExpImgsResults)
@@ -315,11 +315,11 @@ end
 
 #############
 # Saving and Loading
-function filename(ep::ExpImgs)
-    @unpack dir, thin_num, ns, algo = ep
+function filename(exi::ExpImgs)
+    @unpack dir, thin_num, ns, algo = exi
     "$(dir)-thin$(thin_num)-ns$(length(ns))-$(algo)"
 end
-filename(res::ExpImgsResults) = filename(res.ep)
+filename(res::ExpImgsResults) = filename(res.exi)
 """
     save_result(res::ExpImgsResults; overwrite=false, store_imgs=false)
 
@@ -341,7 +341,7 @@ function save_result(res::ExpImgsResults; overwrite=false, store_imgs=false)
     nothing
 end
 load_result(fln) = JLD.load(fln)
-load_result(ep::ExpImgs) = load_result(filename(ep)*".jld")
+load_result(exi::ExpImgs) = load_result(filename(exi)*".jld")
 
 
 ###############

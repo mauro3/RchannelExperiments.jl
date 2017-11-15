@@ -46,7 +46,7 @@ function thin(img,step, alg=[:imresize, :restrict, :subsampling][3])
 end
 
 """
-    rotate_n_crop(img, ep::ExpImgs; verbose=false)
+    rotate_n_crop(img, exi::ExpImgs; verbose=false)
     rotate_n_crop(img, p1::Tuple{Int,Int}, p2::Tuple{Int,Int},
                   halfheight::Integer; verbose=false)
 
@@ -61,8 +61,8 @@ through the center-point.
 
 Notes: needs to be in sync with ExpImgs defaults definition.
 """
-rotate_n_crop(img, ep::ExpImgs; verbose=false) =
-    rotate_n_crop(img, ep.p1, ep.p2, ep.halfheight_crop, verbose=verbose)
+rotate_n_crop(img, exi::ExpImgs; verbose=false) =
+    rotate_n_crop(img, exi.p1, exi.p2, exi.halfheight_crop, verbose=verbose)
 function rotate_n_crop(img, p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, halfheight::Integer; verbose=false)
     mid_point = map(x->fld1(x,2), size(img))
     if verbose
@@ -87,8 +87,8 @@ function rotate_n_crop(img, p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, halfheight::
 end
 
 """
-    prep_img(path::String, ep::ExpImgs; verbose=false)
-    prep_img(img_color, ep; verbose=false)
+    prep_img(path::String, exi::ExpImgs; verbose=false)
+    prep_img(img_color, exi; verbose=false)
 
 Load and prepare image by:
 - rotate and crop
@@ -98,31 +98,31 @@ Also returns:
 - center_dist -- distance to previous center
 - capture_time -- time of image capture
 """
-function prep_img(path::String, ep::ExpImgs; verbose=false)
+function prep_img(path::String, exi::ExpImgs; verbose=false)
     verbose && println(path)
     img_color = load(path);
 
     dt = ImageMagick.magickinfo(path, "exif:DateTimeOriginal")["exif:DateTimeOriginal"]
-    _prep_img(img_color, ep; verbose=verbose)..., DateTime(dt, "yyyy:mm:dd HH:MM:SS") - ep.time_correction
+    _prep_img(img_color, exi; verbose=verbose)..., DateTime(dt, "yyyy:mm:dd HH:MM:SS") - exi.time_correction
 end
-function _prep_img(img_color::AbstractArray, ep::ExpImgs; verbose=false)::Tuple{Matrix{Float64}, Int}
-    @unpack p1, p2, halfheight_crop, thin_num = ep
+function _prep_img(img_color::AbstractArray, exi::ExpImgs; verbose=false)::Tuple{Matrix{Float64}, Int}
+    @unpack p1, p2, halfheight_crop, thin_num = exi
     img_color, center_dist = rotate_n_crop(img_color, p1, p2, halfheight_crop, verbose=verbose)
     img_color = thin(img_color, thin_num);
-    @assert size(img_color)==size(ep) "size(img_color)=$(size(img_color)) not equal size(ep)=$(size(ep))"
+    @assert size(img_color)==size(exi) "size(img_color)=$(size(img_color)) not equal size(exi)=$(size(exi))"
     # calculate the difference in color
-    img = colordiffit(img_color, ep, verbose=verbose);
+    img = colordiffit(img_color, exi, verbose=verbose);
     # find EXIF time and correct it
     return img, center_dist
 end
 
 """
-    colordiffit(img_color, ep::ExpImgs; verbose=false)
+    colordiffit(img_color, exi::ExpImgs; verbose=false)
 
 Use `colordiff` make an image of perceived color difference
 """
-function colordiffit(img_color, ep::ExpImgs; verbose=false)
-    loc1, loc2 = round.(Int, (size(img_color,1)*ep.color_loc[1], size(img_color,2)*ep.color_loc[2]))
+function colordiffit(img_color, exi::ExpImgs; verbose=false)
+    loc1, loc2 = round.(Int, (size(img_color,1)*exi.color_loc[1], size(img_color,2)*exi.color_loc[2]))
     c0 = img_color[loc1,loc2]
     if verbose
         guidict = imshow(img_color)

@@ -1,6 +1,6 @@
 #__precompile__()
 
-module RchannelImages
+module RcImages
 
 using Images, ImageView, ImageSegmentation, ImageMagick
 using CoordinateTransformations, OffsetArrays
@@ -16,7 +16,7 @@ using StatsBase
 using Parameters
 import DSP
 
-export ExpImgs, channel_width, prep_img
+export ExpImgs, ExpImgsResults, channel_width, prep_img
 
 ## TODO:
 # @with_kw struct Exp
@@ -26,6 +26,8 @@ export ExpImgs, channel_width, prep_img
 """
 All parameters needed to turn pixels into meters, assuming
 an image without distortion.
+
+TODO: this should eventually be in ExpSetup
 """
 @with_kw struct Pixel2Meter @deftype Float64
     h1 # distance surface to pupil of camera
@@ -61,22 +63,22 @@ from one Experiment.
     gap = 19
     median_filter_region::Tuple{Int,Int} = (3,7) # (top-bottom, left-right)
     p2m::Pixel2Meter
-    extras::Dict=Dict()
+    extras::Dict{Symbol}=Dict{Symbol,Any}()
 end
-function Base.size(ep::ExpImgs)
-    @unpack halfheight_crop, thin_num, p1, p2 = ep
+function Base.size(exi::ExpImgs)
+    @unpack halfheight_crop, thin_num, p1, p2 = exi
     return fld1(2*halfheight_crop+1,thin_num), fld1(round(Int, sqrt((p2[1]-p1[1])^2 + (p2[2]-p1[2])^2)) +1, thin_num)
 end
 
-function image_files(ep::ExpImgs, nss=ep.ns)
-    @unpack dir = ep
+function image_files(exi::ExpImgs, nss=exi.ns)
+    @unpack dir = exi
     ["$dir/$f" for f in readdir(dir) if lowercase(splitext(f)[2])==".jpg"][nss]
 end
 """
 Hold the result from the processing
 """
 @with_kw struct ExpImgsResults
-    ep::ExpImgs
+    exi::ExpImgs
     capture_times::Vector{DateTime}
     center_dist::Vector{Int}
     ts::Matrix{Int} # tops
@@ -91,7 +93,7 @@ Hold the result from the processing
     # images
     thumbs::Vector{Any} # thumbnail images
     imgs::Vector{Any} # full images
-    extras::Dict=Dict()
+    extras::Dict{Symbol}=Dict{Symbol,Any}()
 end
 Base.length(res::ExpImgsResults) = length(res.capture_times)
 

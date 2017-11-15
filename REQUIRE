@@ -10,3 +10,5 @@ Parameters
 FileIO
 JLD2
 DSP
+Reexport
+LsqFit

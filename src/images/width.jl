@@ -1,12 +1,12 @@
 #########
 # Width
 getmid(img) = fld1(size(img,1),2)
-getmid(ep::ExpImgs) = fld1(size(ep)[1],2)
+getmid(exi::ExpImgs) = fld1(size(exi)[1],2)
 
-top2ind(top, img_or_ep) = getmid(img_or_ep) - top + 1
-bottom2ind(bottom, img_or_ep) = bottom + getmid(img_or_ep)
-top_inds(img_or_ep) = getmid(img_or_ep):-1:1
-bottom_inds(img_or_ep) = getmid(img_or_ep)+1:size(img,1)
+top2ind(top, img_or_exi) = getmid(img_or_exi) - top + 1
+bottom2ind(bottom, img_or_exi) = bottom + getmid(img_or_exi)
+top_inds(img_or_exi) = getmid(img_or_exi):-1:1
+bottom_inds(img_or_exi) = getmid(img_or_exi)+1:size(img,1)
 
 ################
 # width via color tresholding
@@ -77,8 +77,8 @@ end
 
 Determine width using edge detection.
 """
-channel_width_edgedetection(img_, ep; verbose=false) =
-    channel_width_edgedetection(img_, ep.minhalfwidth, ep.gauss_w, ep.quant, ep.gap, verbose=verbose)
+channel_width_edgedetection(img_, exi; verbose=false) =
+    channel_width_edgedetection(img_, exi.minhalfwidth, exi.gauss_w, exi.quant, exi.gap, verbose=verbose)
 function channel_width_edgedetection(img_, minhalfwidth, gauss_w,
                                      quant, gap, morphgrad=false; verbose=false)
     @assert !iseven(gap) "gap must be a odd number"
@@ -247,21 +247,21 @@ end
 #
 
 """
-    channel_width(ep::ExpImgs; verbose=false)
+    channel_width(exi::ExpImgs; verbose=false)
 
-Returns the best of both outlines for all images in a ep.  Returns
+Returns the best of both outlines for all images in a exi.  Returns
 
 - tops, bottoms: pixel distance to top and bottom outline in terms of
   pixels of the cropped image (i.e. not corrected with center_dist)
 - t_dist, b_dist: distance in meters to top and bottom from a line
-  through the original image center and parallel to (ep.p1, ep.p2).
+  through the original image center and parallel to (exi.p1, exi.p2).
 
 """
 
-function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
+function channel_width(exi::ExpImgs; verbose=false, vverbose=false, saveit=true,
                        overwrite=false, store_imgs=false)
     @unpack dir, ns, p1, p2, thin_num, algo,
-            minhalfwidth_orig, gauss_w, quant, gap, median_filter_region = ep
+            minhalfwidth_orig, gauss_w, quant, gap, median_filter_region = exi
 
     println("\n Figuring out R-channel width for pictures in dir: $dir\n")
     minhalfwidth = minhalfwidth_orig÷thin_num
@@ -270,14 +270,14 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
     bottoms = Int[]
     last_top = [minhalfwidth]
     last_bottom = [minhalfwidth]
-    ncol = size(ep)[2]
+    ncol = size(exi)[2]
     center_dists = Int[]
     thumbs = []
     imgs = []
     capture_times = DateTime[]
-    @showprogress for (n,fl) in zip(ns, image_files(ep))
-        img, center_dist, capture_time = prep_img(fl, ep; verbose=vverbose)
-        t, b = _channel_width(img, last_top, last_bottom, ep, "$n:  $fl",
+    @showprogress for (n,fl) in zip(ns, image_files(exi))
+        img, center_dist, capture_time = prep_img(fl, exi; verbose=vverbose)
+        t, b = _channel_width(img, last_top, last_bottom, exi, "$n:  $fl",
                              algo,
                              verbose=verbose,
                              vverbose=vverbose)
@@ -290,11 +290,11 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
         store_imgs && push!(imgs, img)
         push!(capture_times, capture_time)
     end
-    tops = reshape(tops, size(ep)[2], length(tops)÷size(ep)[2])
-    bottoms = reshape(bottoms, size(ep)[2], length(tops)÷size(ep)[2])
-    ts_dist = pixel2meter.(tops.+center_dists', ep)
-    bs_dist = pixel2meter.(bottoms.-center_dists', ep)
-    res = ExpImgsResults(ep,
+    tops = reshape(tops, size(exi)[2], length(tops)÷size(exi)[2])
+    bottoms = reshape(bottoms, size(exi)[2], length(tops)÷size(exi)[2])
+    ts_dist = pixel2meter.(tops.+center_dists', exi)
+    bs_dist = pixel2meter.(bottoms.-center_dists', exi)
+    res = ExpImgsResults(exi,
                          capture_times,
                          center_dists,
                          tops,
@@ -311,9 +311,9 @@ function channel_width(ep::ExpImgs; verbose=false, vverbose=false, saveit=true,
 end
 
 
-function _channel_width(img, last_top, last_bottom, ep::ExpImgs, title, algo;
+function _channel_width(img, last_top, last_bottom, exi::ExpImgs, title, algo;
                        verbose=false, vverbose=false)
-    @unpack minhalfwidth_orig, gauss_w, quant, gap, median_filter_region, thin_num = ep
+    @unpack minhalfwidth_orig, gauss_w, quant, gap, median_filter_region, thin_num = exi
     minhalfwidth = minhalfwidth_orig÷thin_num
 
     if length(last_bottom)==1
