@@ -18,11 +18,6 @@ import DSP
 
 export ExpImgs, ExpImgsResults, channel_width, prep_img
 
-## TODO:
-# @with_kw struct Exp
-#     experiment_start::Dates.DateTime # start-time of experiment.  Plotting will be relative to this time
-# end
-
 """
 All parameters needed to turn pixels into meters, assuming
 an image without distortion.
