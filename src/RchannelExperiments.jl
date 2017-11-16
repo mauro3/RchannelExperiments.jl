@@ -32,21 +32,22 @@ This is one Experiment.
     experiment_running::Vector{Tuple{Time,Time}}=Tuple{Time,Time}[]
     # Time of events
     events::Dict{Dates.DateTime,Any}=Dict{Dates.DateTime,Any}()
-    setup::ExpSetup
+    setup::Setup
     # sub exps
-    expimg::Union{ExpImgs,Void}
-    explv::Union{ExpLabView,Void}
-    expvol::ExpVol=ExpVol()
-    exptemp::ExpTemp=ExpTemp(notebook_pdf="")
+    exi::Union{ExpImgs,Void}
+    exl::Union{ExpLabView,Void}
+    exv::ExpVol=ExpVol()
+    ext::ExpTemp=ExpTemp(notebook_pdf="")
     extras::Dict{Symbol}=Dict{Symbol,Any}()
 end
 
 "Holds all results"
 @with_kw struct RcRes
-    rex::RcExp
+    ex::RcExp
     resi::ExpImgsResults
-    reslv::ExpLabViewResults
+    resl::ExpLabViewResults
     rest::ExpTempResults=ExpTempResults()
+    resv::ExpVolResults=ExpVolResults()
     extras::Dict{Symbol}=Dict{Symbol,Any}()
 end
 # get relevant data

@@ -22,7 +22,7 @@ export ExpImgs, ExpImgsResults, channel_width, prep_img
 All parameters needed to turn pixels into meters, assuming
 an image without distortion.
 
-TODO: this should eventually be in ExpSetup
+TODO: this should eventually be in Setup
 """
 @with_kw struct Pixel2Meter @deftype Float64
     h1 # distance surface to pupil of camera
