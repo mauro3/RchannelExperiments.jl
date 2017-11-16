@@ -1,6 +1,8 @@
 #__precompile__()
 
 module RcImages
+import ..RchannelExperiments: plot_res
+using ..RchannelExperiments
 
 using Images, ImageView, ImageSegmentation, ImageMagick
 using CoordinateTransformations, OffsetArrays
@@ -15,8 +17,11 @@ PyCall.@pyimport matplotlib.animation as anim
 using StatsBase
 using Parameters
 import DSP
+import Interpolations
+const IP=Interpolations
 
-export ExpImgs, ExpImgsResults, channel_width, prep_img
+
+export ExpImgs, ExpImgsResults, channel_width, prep_img, get_time_series
 
 """
 All parameters needed to turn pixels into meters, assuming
@@ -74,14 +79,16 @@ Hold the result from the processing
 """
 @with_kw struct ExpImgsResults
     exi::ExpImgs
-    capture_times::Vector{DateTime}
-    center_dist::Vector{Int}
+    time::Vector{Dates.Time} # time of day of image
+    t::Vector{Float64}     # time since start of experiment (s)
+    center_dist::Vector{Int} # distance from original image-center to center line of R-channel
     ts::Matrix{Int} # tops
     bs::Matrix{Int} # bottoms
     ts_dist::Matrix{Float64}
     bs_dist::Matrix{Float64}
     # products
     dia_mean::Vector{Float64} # mean diameter
+    dia_std::Vector{Float64} # std of diameter
     dia_quant::Matrix{Float64} # 10%, 50%, 90% quantiles
     scalloping::Vector{Float64} # scalloping factor
     tb_cor::Vector{Float64}
@@ -90,7 +97,7 @@ Hold the result from the processing
     imgs::Vector{Any} # full images
     extras::Dict{Symbol}=Dict{Symbol,Any}()
 end
-Base.length(res::ExpImgsResults) = length(res.capture_times)
+Base.length(res::ExpImgsResults) = length(res.time)
 
 include("optics.jl")
 include("helpers.jl")

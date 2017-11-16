@@ -4,28 +4,42 @@
 Elapsed time in seconds for i-th picture
 """
 elapsed_time(res::ExpImgsResults, i)::Float64 =
-    (Dates.Second(res.capture_times[i] - res.exi.experiment_start)).value
+    (Dates.Second(res.time[i] - res.exi.experiment_start)).value
 
 """
+    get_time_series(res::ExpImgsResults, tt)
     get_time_series(res::ExpImgsResults)
 
+tt in seconds since ex.experiment_start.  If no tt then return at times.
+
 Get time series data as matrix:
-- time
 - mean diameter
+- std of diameter
 - median diameter
 - 10% quantile
 - 90% quantile
 - scalloping
 - symmetry
-"""
-function get_time_series(res::ExpImgsResults)
-    @unpack dia_mean, dia_quant, scalloping, tb_cor = res
-    t = elapsed_time.(res, 1:length(res))
-    return t, dia_mean, dia_quant', scalloping, tb_cor
-end
 
-"Image median filter"
-median_filter(img, window=(3,3)) = mapwindow(median!, img, window)
+Example
+
+    dia_mean, dia_std, dia_med, dia_10, dia_90, scalloping, sym = get_time_series(res, tt)
+
+"""
+function get_time_series(res::ExpImgsResults, tt)
+    @unpack dia_mean, dia_std, dia_quant, scalloping, tb_cor, t = res
+    vars = [dia_mean, dia_std, dia_quant[2,:], dia_quant[1,:], dia_quant[3,:], scalloping, tb_cor]
+    outs = eltype(vars)[]
+    for v in vars
+        ipt = IP.interpolate((t,), v, IP.Gridded(IP.Linear()))
+        push!(outs, ipt[tt])
+    end
+    return outs
+end
+function get_time_series(res::ExpImgsResults)
+    @unpack dia_mean, dia_std, dia_quant, scalloping, tb_cor, t = res
+    return [dia_mean, dia_std, dia_quant[2,:], dia_quant[1,:], dia_quant[3,:], scalloping, tb_cor]
+end
 
 #################
 # findpeaks
@@ -235,7 +249,7 @@ of a running window.
     vec -- input vector
     comp_vec_q=> -- comparison to use: > means remove outliers above
     quant=0.9 -- what quantile to compare against
-    quant_offset=mean(vec)/2
+    quant_offset=median(vec)/2
     quant_factor=1
     pre_window=5, post_window=0 -- window size over which to look at values
 
@@ -285,33 +299,6 @@ function find_spikes_quantile(vec, comp_vec_q= >,
     outliers, med[outliers-pre_window]
 end
 
-"Filters outliers above certain quantiles"
-function quantile_filter!(vec,
-                          quant_cut=0.1, quant_offset=0, quant_factor=1,
-                          pre_window=length(vec)÷10, post_window = pre_window+1,
-                          niter = 10,
-                          verbose=false)
-    lenu = lenl = -1
-    for i=1:niter
-        upper, medu = find_spikes_quantile(vec, >,
-                                           quant_cut, quant_offset, quant_factor,
-                                           pre_window, post_window;
-                                           verbose=verbose)
-        lower, medl = find_spikes_quantile(vec, <,
-                                           1-quant_cut, quant_offset, quant_factor,
-                                           pre_window, post_window;
-                                           verbose=verbose)
-
-        lenu==length(upper) && break
-        lenl==length(lower) && break
-        lenu = length(upper)
-        lenl = length(lower)
-        vec[upper] = medu
-        vec[lower] = medl
-    end
-    vec
-end
-
 
 #############
 # Saving and Loading
@@ -343,18 +330,21 @@ end
 load_result(fln) = JLD.load(fln)
 load_result(exi::ExpImgs) = load_result(filename(exi)*".jld")
 
-
-###############
-# Filtering
-
-"""
-Lowpass filter with a cutoff at `wavelength`,
-expressed as ratio of wavelength/image width.
-"""
-function lowpass_filter(lines, wavelength=0.03)
-    wavelength_pix = wavelength*size(lines,1)
-    @show frq = 2/wavelength_pix
-    responsetype = DSP.Lowpass(frq)
-    designmethod = DSP.Butterworth(4)
-    round.(Int, DSP.filtfilt(DSP.digitalfilter(responsetype, designmethod), lines))
+load_legacy(fln, ex) = load_legacy(fln, ex.experiment_start, ex.experiment_running)
+function load_legacy(fln, experiment_start, experiment_running)
+    @show experiment_start, experiment_running
+    res = type2dict(JLD.load(fln)["res"])
+    ep = type2dict(pop!(res, :ep))
+    ep[:p2m] = RcImages.Pixel2Meter(;type2dict(ep[:p2m])...)
+    ep[:extras] = Dict{Symbol,Any}()
+    ep[:extras][:fln] = fln
+    exi = ExpImgs(;ep...)
+    res[:exi] = exi
+    res[:extras] = Dict{Symbol,Any}()
+    res[:extras][:fln] = fln
+    res[:time] = Dates.Time.(pop!(res, :capture_times))
+    res[:dia_std] = vec(std(res[:ts_dist]+res[:bs_dist],1))
+    # figure out times of flowing water
+    res[:t] = time2seconds(res[:time], experiment_start)
+    ExpImgsResults(;res...)
 end

@@ -145,31 +145,35 @@ function animate_res(res::ExpImgsResults; image=[:none,:thumb,:img][1], save=fal
     save && myanim[:save](fln, bitrate=-1, extra_args=["-vcodec", "libx264", "-pix_fmt", "yuv420p"])
 end
 
-function plot_res(res::ExpImgsResults; tscale=60, plot_ns=false, figsize=(15,15))
-    P.figure(figsize=figsize)
-    t, dia_mean, dia_quant, scalloping, tb_cor = get_time_series(res)
-    dia_std = std(res.ts_dist+res.bs_dist,1)'
+function plot_res(ex, res::ExpImgsResults; tscale=60,
+                  fig_axs=P.subplots(3,1,sharex="all"),
+                  t0=:exp)
+    fig,axs = fig_axs
+
+    # time and indices
+    tt = t0==:exp ? res.t : t0
+    dia_mean, dia_std, dia_med, dia_10, dia_90, scalloping, tb_cor = get_time_series(res, tt)
     scalloping2 = dia_std./dia_mean
-    t ./= tscale
-    if plot_ns
-        t = res.exi.ns
-    end
-    ax = P.subplot(3,1,1)
-    P.plot(t, dia_mean, "-x", label="mean")
-    P.plot(t, dia_quant[:,2], "-x", label="median")
-    P.plot(t, dia_quant[:,1], "-x", label="10%")
-    P.plot(t, dia_quant[:,3], "-x", label="90%")
+
+    tt /= tscale
+
+    P.axes(axs[1])
+    P.plot(tt, dia_mean, "-x", label="mean")
+    P.plot(tt, dia_med, "-x", label="median")
+    P.plot(tt, dia_10, "-x", label="10%")
+    P.plot(tt, dia_90, "-x", label="90%")
     P.legend()
     P.ylabel("diameter (m)")
-    P.subplot(3,1,2,sharex=ax)
-    P.plot(t, scalloping, "-x", label="scallop quantile (0..2)")
-    P.plot(t, scalloping2, "-x", label="scallop std/mean (0..2)")
+
+    P.axes(axs[2])
+    P.plot(tt, scalloping, "-x", label="scallop quantile (0..2)")
+    P.plot(tt, scalloping2, "-x", label="scallop std/mean (0..2)")
     P.legend()
     P.ylabel("factor ()")
-    P.subplot(3,1,3,sharex=ax)
-    P.plot(t, tb_cor, "-x", label="symmetry (correlation) (-1..1)")
+
+    P.axes(axs[3])
+    P.plot(tt, tb_cor, "-x", label="symmetry (correlation) (-1..1)")
     P.ylabel("symmetry corr. ()")
     st = res.exi.experiment_start
     P.xlabel("Time period since $(Dates.Time(st)) on $(Dates.Date(st)) ($(tscale)s)")
-
 end

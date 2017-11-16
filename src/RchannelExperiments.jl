@@ -1,10 +1,18 @@
 module RchannelExperiments
-using Reexport
-using Parameters
+using Reexport, Parameters
+import Images
 import Base.Dates: Time
+import DSP, PyPlot
+const P=PyPlot
 
-export RcExp, RcRes
+export RcExp, RcRes, rho, g
+const rho = 1000
+const g = 9.81
+const mu = 0.001792 # dynamic viscosity of water at 0C https://www.thermexcel.com/english/tables/eau_atm.htm
+const nu = mu/rho  # kinematic viscosity
 
+
+include("helpers.jl")
 # The experiment setup, such as geometry, measurements, etc.
 include("setup/RcSetup.jl")
 @reexport using .RcSetup
@@ -27,11 +35,11 @@ This is one Experiment.
 @with_kw struct RcExp
     name::String # probably just the ISO date: 2017-10-06
     # start-time of experiment.  Plotting will be relative to this time
-    experiment_start::Dates.DateTime
+    experiment_start::DateTime
     # The time periods when water is flowing
     experiment_running::Vector{Tuple{Time,Time}}=Tuple{Time,Time}[]
     # Time of events
-    events::Dict{Dates.DateTime,Any}=Dict{Dates.DateTime,Any}()
+    events::Dict{Any,Any}=Dict{Any,Any}()
     setup::Setup
     # sub exps
     exi::Union{ExpImgs,Void}
@@ -44,12 +52,16 @@ end
 "Holds all results"
 @with_kw struct RcRes
     ex::RcExp
-    resi::ExpImgsResults
-    resl::ExpLabViewResults
+    resi::Union{ExpImgsResults,Void}
+    resl::Union{ExpLabViewResults,Void}
     rest::ExpTempResults=ExpTempResults()
     resv::ExpVolResults=ExpVolResults()
     extras::Dict{Symbol}=Dict{Symbol,Any}()
 end
+
+include("plotting.jl")
+
+include("proc.jl")
 # get relevant data
 function get_Q(res::RcRes)
     return t, Q
