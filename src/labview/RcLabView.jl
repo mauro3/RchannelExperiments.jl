@@ -114,6 +114,8 @@ function mBar_to_m_h2o(p)
 end
 Pa_to_m_h2o(p) = p/rho/g
 
+m_h2o_to_Pa(p) = p*rho*g
+
 "Transforms the labview file into a DateTime of the logging start"
 file2datetime(file) = DateTime(splitext(splitdir(file)[2])[1], "yyyymmdd-HHMMSS")
 file2time(file) = Time(file2datetime(file))

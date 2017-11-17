@@ -1,24 +1,44 @@
 export calculate_press_grad, calculate_press_grad_all
 
 """
+    port_dist(port1, port2, port2channels, portdists)
+    port_dist(port1, port2, res)
+
+Distance between two pressure ports
+"""
+port_dist(port1, port2, res::RcRes) = port_dist(port1, port2, res.ex)
+function port_dist(port1, port2, ex::RcExp)
+    @unpack portdists, port2channels = ex.setup
+    port_dist(port1, port2, port2channels, portdists)
+end
+function port_dist(port1, port2, port2channels, portdists)
+    ports = keys(port2channels)
+    slot1, slot2 = find(x->x==port1, ports)[1], find(x->x==port2, ports)[1]
+    deltaL = sum(portdists[slot1:slot2-1])
+    return deltaL
+end
+
+
+"""
     calculate_press_grad(res, port1, port2)
 
 Calculates the pressure gradient over the ports:
 
 
 """
-calculate_press_grad(res::RcExp, port1, port2) =
+calculate_press_grad(res::RcRes, port1, port2) =
     calculate_press_grad(res.ex, res.resl)
 function calculate_press_grad(ex::RcExp, resl::ExpLabViewResults, port1, port2)
-    @unpack portdists, port2channels = ex.setup
     @unpack press, press_std = resl
     #press, press_std = resl.press_raw, resl.press_std_raw
-    ports = keys(port2channels)
-    slot1, slot2 = find(x->x==port1, ports)[1], find(x->x==port2, ports)[1]
-    deltaL = sum(portdists[slot1:slot2-1])
-    grad = (press[port2]-press[port1])./deltaL
-    grad_std = sqrt.(press_std[port2].^2 + press_std[port1].^2)./deltaL
+    deltaL = port_dist(port1, port2, ex)
+    grad, grad_std = calculate_press_grad(press[port1], press[port2], press_std[port1], press_std[port2], deltaL)
     return grad, grad_std, (port1=>port2, deltaL)
+end
+function calculate_press_grad(press1, press2, press1_std, press2_std, deltaL)
+    grad = (press1-press2)./deltaL
+    grad_std = sqrt.(press1_std.^2 + press2_std.^2)./deltaL
+    return grad, grad_std
 end
 calculate_press_grad(res::RcExp) = calculate_press_grad(res.ex, res.resl)
 function calculate_press_grad(ex::RcExp, resl::ExpLabViewResults)
@@ -94,4 +114,52 @@ function Re_nr(res::RcRes, inds=nothing)
     D, D_std = get_time_series(resi, trun)
     Q = resl.Q[irun]
     Re_nr.(D,Q)
+end
+
+
+"""
+    f_haaland(Re, epsilon, Dh)
+    f_haaland(Re, rel_roughness)
+
+D-W f factor by Haaland 1983.  Epsilon is the size of the roughness,
+Dh hyd-diameter.
+"""
+f_haaland(Re, epsilon, Dh) = f_haaland(Re, epsilon/Dh)
+function f_haaland(Re, rel_roughness)
+    tmp = -1.8 * log( ((rel_roughness/3.7)^1.11 + 6.9/Re) )
+    1/tmp^2
+end
+
+### stacking
+function stack_it(vec, step)
+    halfstep = step÷2
+    out = eltype(vec)[]
+    for i = halfstep+1:step:length(vec)-halfstep
+        push!(out, mean(vec[i-halfstep:i+halfstep]))
+    end
+    out
+end
+function stack_it_time(time, step)
+    halfstep = step÷2
+    out = eltype(time)[]
+    for i = halfstep+1:step:length(time)-halfstep
+        push!(out, time[i])
+    end
+    out
+end
+
+
+### purge high std
+"""
+    find_low_std(press_std, ports, irun=1:length(first(press_std)), thresh=100)
+    -> inds
+
+Find indices of low std.
+"""
+function find_low_std(press_std, ports, irun=1:length(first(press_std)), thresh=100)
+    out = press_std[ports[1]][irun].<thresh
+    for i=2:length(ports)
+        out = (press_std[ports[i]][irun].<thresh) .& out
+    end
+    find(out)
 end

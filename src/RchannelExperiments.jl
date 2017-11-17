@@ -62,6 +62,7 @@ end
 include("plotting.jl")
 
 include("proc.jl")
+include("uncertainty.jl")
 # get relevant data
 function get_Q(res::RcRes)
     return t, Q
