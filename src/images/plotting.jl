@@ -147,33 +147,43 @@ end
 
 function plot_res(ex, res::ExpImgsResults; tscale=60,
                   fig_axs=P.subplots(3,1,sharex="all"),
-                  t0=:exp)
+                  t0=:exp, fmt="-", tit=ex.name,
+                  use=[:mean,:median][1])
     fig,axs = fig_axs
 
     # time and indices
     tt = t0==:exp ? res.t : t0
     dia_mean, dia_std, dia_med, dia_10, dia_90, scalloping, tb_cor = get_time_series(res, tt)
-    scalloping2 = dia_std./dia_mean
+    scalloping2 = 3*dia_std./dia_mean # ± 4*std is about 96%, comparable to the 10%-90% used in the quantiles
 
     tt /= tscale
 
     P.axes(axs[1])
-    P.plot(tt, dia_mean, "-x", label="mean")
-    P.plot(tt, dia_med, "-x", label="median")
-    P.plot(tt, dia_10, "-x", label="10%")
-    P.plot(tt, dia_90, "-x", label="90%")
+    P.title(tit)
+
+    tocm = 100
+    if use==:median
+        P.fill_between(tt, dia_10*tocm, dia_90*tocm, alpha=0.3, label="10-90% quantile")
+        P.plot(tt, dia_med*tocm, fmt, label="median")
+    elseif use==:mean
+        P.plot(tt, dia_mean*tocm, fmt, label="mean")
+        P.fill_between(tt, (dia_mean-dia_std)*tocm, (dia_mean+dia_std)*tocm, alpha=0.3, label="mean ± std")
+    else
+        error()
+    end
+
     P.legend()
-    P.ylabel("diameter (m)")
+    P.ylabel("Diameter (cm)")
 
     P.axes(axs[2])
-    P.plot(tt, scalloping, "-x", label="scallop quantile (0..2)")
-    P.plot(tt, scalloping2, "-x", label="scallop std/mean (0..2)")
-    P.legend()
-    P.ylabel("factor ()")
+    use==:median && P.plot(tt, scalloping, fmt, label="quantile")
+    use==:mean && P.plot(tt, scalloping2, fmt, label="scallop std/mean (0..2)")
+    #P.legend()
+    P.ylabel("Scalloping")
 
     P.axes(axs[3])
-    P.plot(tt, tb_cor, "-x", label="symmetry (correlation) (-1..1)")
-    P.ylabel("symmetry corr. ()")
+    P.plot(tt, tb_cor, fmt, label="symmetry (correlation) (-1..1)")
+    P.ylabel("Symmetry")
     st = res.exi.experiment_start
-    P.xlabel("Time period since $(Dates.Time(st)) on $(Dates.Date(st)) ($(tscale)s)")
+    P.xlabel("Time (min)")
 end
